@@ -55,6 +55,32 @@ CREATE TABLE IF NOT EXISTS recuperacoes (
     expira_em TEXT NOT NULL,
     usado INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS campanhas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    objetivo TEXT NOT NULL DEFAULT '',
+    cliente_id INTEGER NOT NULL REFERENCES utilizadores (id),
+    marketeer_id INTEGER NOT NULL REFERENCES utilizadores (id),
+    budget_centimos INTEGER,
+    data_inicio TEXT,
+    data_fim TEXT,
+    criada_em TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pedidos_campanha (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cliente_id INTEGER NOT NULL REFERENCES utilizadores (id),
+    objetivo TEXT NOT NULL,
+    orcamento_centimos INTEGER NOT NULL,
+    prazo TEXT NOT NULL,
+    plataformas TEXT NOT NULL DEFAULT '',
+    estado TEXT NOT NULL DEFAULT 'pendente'
+        CHECK (estado IN ('pendente', 'em_analise', 'aprovado', 'rejeitado', 'cancelado')),
+    motivo_rejeicao TEXT NOT NULL DEFAULT '',
+    campanha_id INTEGER REFERENCES campanhas (id) ON DELETE SET NULL,
+    criado_em TEXT NOT NULL
+);
 """
 
 

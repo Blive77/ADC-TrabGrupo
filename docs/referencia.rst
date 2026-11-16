@@ -35,6 +35,8 @@ Modelos, erros e utilitários
 
 .. automodule:: gestor_campanhas.seguranca
 
+.. automodule:: gestor_campanhas.dinheiro
+
 Repositórios
 ------------
 
@@ -60,6 +62,16 @@ Códigos de recuperação
 
 .. automodule:: gestor_campanhas.repositorios.recuperacoes
 
+Campanhas
+~~~~~~~~~
+
+.. automodule:: gestor_campanhas.repositorios.campanhas
+
+Pedidos de campanha
+~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.repositorios.pedidos
+
 Serviços
 --------
 
@@ -80,8 +92,8 @@ Conta do utilizador
 
 .. automodule:: gestor_campanhas.servicos.contas
 
-Validação dos dados de uma conta
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Validação dos dados
+~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: gestor_campanhas.servicos.validacao
 
@@ -99,6 +111,16 @@ Gestão de clientes e marketeers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: gestor_campanhas.servicos.gestao
+
+Campanhas
+~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.campanhas
+
+Pedidos de campanha
+~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.pedidos
 
 Dados de demonstração
 ---------------------
@@ -134,6 +156,16 @@ Gestão de clientes e marketeers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: gestor_campanhas.cli.gestao
+
+Campanhas
+~~~~~~~~~
+
+.. automodule:: gestor_campanhas.cli.campanhas
+
+Pedidos de campanha
+~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.cli.pedidos
 
 Opções da conta
 ~~~~~~~~~~~~~~~
