@@ -152,3 +152,47 @@ def atualizar_dados(
     ligacao.commit()
     return obter_por_id(ligacao, identificador)
 
+
+
+def listar_por_perfil(ligacao: sqlite3.Connection, perfil: str) -> list[Utilizador]:
+    """Devolve todos os utilizadores de um perfil, pela ordem em que foram criados.
+
+    Inclui as contas desativadas.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param perfil: Um dos perfis de :mod:`gestor_campanhas.modelos`.
+    :return: Utilizadores desse perfil. Lista vazia se não houver nenhum.
+    """
+    linhas = ligacao.execute(
+        f"SELECT {_COLUNAS} FROM utilizadores WHERE perfil = ? ORDER BY id", (perfil,)
+    ).fetchall()
+    return [_de_linha(linha) for linha in linhas]
+
+
+def atualizar_email(ligacao: sqlite3.Connection, identificador: int, email: str) -> Utilizador:
+    """Altera o email de um utilizador.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param identificador: Identificador do utilizador.
+    :param email: Email novo, que tem de ser único.
+    :return: O utilizador, já com o email novo.
+    :raises sqlite3.IntegrityError: Se o email já for de outro utilizador.
+    """
+    ligacao.execute("UPDATE utilizadores SET email = ? WHERE id = ?", (normalizar_email(email), identificador))
+    ligacao.commit()
+    return obter_por_id(ligacao, identificador)
+
+
+def definir_ativo(ligacao: sqlite3.Connection, identificador: int, ativo: bool) -> Utilizador:
+    """Ativa ou desativa a conta de um utilizador.
+
+    Uma conta desativada continua na base de dados, com todos os seus dados.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param identificador: Identificador do utilizador.
+    :param ativo: ``True`` para ativar, ``False`` para desativar.
+    :return: O utilizador, já com o estado novo.
+    """
+    ligacao.execute("UPDATE utilizadores SET ativo = ? WHERE id = ?", (1 if ativo else 0, identificador))
+    ligacao.commit()
+    return obter_por_id(ligacao, identificador)

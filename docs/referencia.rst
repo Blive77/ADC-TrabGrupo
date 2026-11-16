@@ -80,6 +80,11 @@ Conta do utilizador
 
 .. automodule:: gestor_campanhas.servicos.contas
 
+Validação dos dados de uma conta
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.validacao
+
 Recuperação da password
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -89,6 +94,11 @@ Emails
 ~~~~~~
 
 .. automodule:: gestor_campanhas.servicos.correio
+
+Gestão de clientes e marketeers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.gestao
 
 Dados de demonstração
 ---------------------
@@ -119,6 +129,11 @@ Opções do Administrador
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: gestor_campanhas.cli.admin
+
+Gestão de clientes e marketeers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.cli.gestao
 
 Opções da conta
 ~~~~~~~~~~~~~~~

@@ -27,6 +27,7 @@ Estrutura de pastas
        principal.py       menu inicial e entrada na aplicação
        perfis.py          menu de cada perfil
        admin.py           opções do menu do Administrador
+       gestao.py          gestão de clientes e marketeers, pelo Administrador
        conta.py           opções da conta, comuns a todos os perfis
        recuperacao.py     recuperação da password
    tests/                 testes automáticos (pytest)
@@ -83,6 +84,34 @@ Exemplo: entrar na aplicação
    o menu do perfil. Se não, é lançado
    :class:`~gestor_campanhas.erros.ErroAutenticacao` e o menu mostra a
    mensagem.
+
+Exemplo: adicionar um cliente
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+1. :func:`gestor_campanhas.cli.gestao.adicionar` pede os dados no ecrã.
+2. :func:`gestor_campanhas.servicos.gestao.criar` valida-os com
+   :mod:`gestor_campanhas.servicos.validacao`, confirma que o email ainda não
+   tem conta e gera a password inicial.
+3. :func:`gestor_campanhas.repositorios.utilizadores.criar` guarda a conta,
+   com o hash da password.
+4. :func:`gestor_campanhas.servicos.correio.enviar` envia as credenciais.
+5. Se algum dado não for válido, o serviço lança
+   :class:`~gestor_campanhas.erros.ErroValidacao` antes de guardar seja o que
+   for, e o menu mostra a mensagem.
+
+Os mesmos ecrãs e as mesmas funções servem para os marketeers: o perfil é
+passado como argumento. O que muda de um perfil para o outro está em
+:data:`gestor_campanhas.cli.gestao.NOMES` e
+:data:`gestor_campanhas.cli.gestao.ACOES`.
+
+Contas desativadas
+------------------
+
+Remover um cliente ou um marketeer não apaga a linha da tabela
+``utilizadores``: põe a coluna ``ativo`` a zero. Assim, as sessões já
+registadas (e, nas fases seguintes, as campanhas) continuam ligadas a uma
+conta que existe. Uma conta desativada não pode entrar nem recuperar a
+password, e pode ser reativada.
 
 Passwords
 ---------
