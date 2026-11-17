@@ -72,6 +72,11 @@ Pedidos de campanha
 
 .. automodule:: gestor_campanhas.repositorios.pedidos
 
+Criativos
+~~~~~~~~~
+
+.. automodule:: gestor_campanhas.repositorios.criativos
+
 Serviços
 --------
 
@@ -122,6 +127,16 @@ Pedidos de campanha
 
 .. automodule:: gestor_campanhas.servicos.pedidos
 
+Criativos
+~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.criativos
+
+Ficheiros dos criativos
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.ficheiros
+
 Dados de demonstração
 ---------------------
 
@@ -166,6 +181,11 @@ Pedidos de campanha
 ~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: gestor_campanhas.cli.pedidos
+
+Criativos
+~~~~~~~~~
+
+.. automodule:: gestor_campanhas.cli.criativos
 
 Opções da conta
 ~~~~~~~~~~~~~~~

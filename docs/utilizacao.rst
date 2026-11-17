@@ -43,8 +43,9 @@ São também criadas três campanhas: ``Natal 2026`` e ``Regresso às aulas``, d
 marketeer ``marketeer@agencia.pt``, e ``Bicicletas de primavera``, da
 marketeer ``marta@agencia.pt``. Ficam também dois pedidos de campanha
 pendentes, um do cliente ``jose@padaria.pt`` e outro da cliente
-``beatriz@bicicletas.pt``. O comando pode ser repetido: só acrescenta o que
-faltar.
+``beatriz@bicicletas.pt``, e quatro criativos: dois na campanha
+``Natal 2026``, um em ``Regresso às aulas`` e um em ``Bicicletas de
+primavera``. O comando pode ser repetido: só acrescenta o que faltar.
 
 Entrar e sair
 -------------
@@ -349,17 +350,22 @@ alterações. Um marketeer só vê e só altera as suas campanhas.
 
 .. code-block:: text
 
-   N.º  Nome               Cliente        Início      Fim         Budget      Estado
-   ---  -----------------  -------------  ----------  ----------  ----------  -----------
-   1    Natal 2026         Carla Cliente  2026-12-01  2026-12-24  1 500,00 €  Por começar
-   2    Regresso às aulas  José Padeiro   2026-09-01  2026-09-30  800,00 €    Terminada
+   N.º  Nome               Cliente        Início      Fim         Budget      Estado       Despesa     Restante
+   ---  -----------------  -------------  ----------  ----------  ----------  -----------  ----------  --------
+   1    Natal 2026         Carla Cliente  2026-12-01  2026-12-24  1 500,00 €  Por começar  1 300,00 €  200,00 €
+   2    Regresso às aulas  José Padeiro   2026-09-01  2026-09-30  800,00 €    Terminada    300,00 €    500,00 €
 
    2 campanhas.
 
 O número da primeira coluna identifica a campanha nas outras opções.
 
 O budget aparece como ``Por definir`` enquanto o Administrador não o
-atribuir. O estado é calculado a partir das datas:
+atribuir. A **despesa** é a soma do custo estimado dos criativos da campanha,
+seja qual for o estado deles; um criativo sem custo conta como zero. O
+**restante** é o budget menos a despesa: fica negativo quando a despesa passa
+o budget, e aparece como ``Por definir`` enquanto não houver budget.
+
+O estado é calculado a partir das datas:
 
 .. list-table::
    :header-rows: 1
@@ -417,7 +423,19 @@ Ver campanha
 ^^^^^^^^^^^^
 
 Pede o número da campanha e mostra todos os dados dela, incluindo o objetivo,
-que não cabe na lista.
+que não cabe na lista, a despesa, o restante e quantos criativos a campanha
+tem em cada estado:
+
+.. code-block:: text
+
+     Budget:    1 500,00 €
+     Despesa:   1 300,00 €
+     Restante:  200,00 €
+     Estado:    Por começar
+     Criativos: 2 (Em preparação: 2)
+
+Se a despesa passar o budget, aparece no fim o aviso descrito em
+**Criativos**.
 
 Eliminar campanha
 ^^^^^^^^^^^^^^^^^
@@ -425,6 +443,173 @@ Eliminar campanha
 Pede o número da campanha, mostra os dados dela e pede confirmação. Uma
 campanha eliminada não pode ser recuperada. Um marketeer só pode eliminar as
 suas campanhas.
+
+Uma campanha com criativos não pode ser eliminada: aparece uma mensagem com
+o número de criativos que ela tem. Primeiro eliminam-se os criativos, na
+opção **Criativos**, e depois a campanha.
+
+Criativos
+~~~~~~~~~
+
+Um criativo é uma peça de uma campanha: uma imagem, um vídeo ou um texto que
+vai ser publicado. A opção mostra as campanhas do marketeer e pede o número
+de uma delas. Depois mostra os criativos dessa campanha e, por baixo, as
+opções para os gerir.
+
+.. code-block:: text
+
+   ============================================================
+   Criativos da campanha Natal 2026 (Carla Cliente)
+   ============================================================
+   N.º  Nome             Custo     Prazo       Público-alvo               Plataforma  Estado
+   ---  ---------------  --------  ----------  -------------------------  ----------  -------------
+   1    Banner de Natal  400,00 €  2026-11-25  Famílias da região de...   Facebook    Em preparação
+   2    Vídeo da montra  900,00 €  2026-11-28  Jovens adultos, 18 a 3...  Instagram   Em preparação
+
+   2 criativos.
+
+O custo aparece como ``Por definir`` e os outros dados como ``-`` enquanto
+não forem indicados. Um público-alvo comprido aparece cortado e terminado em
+``...``; o texto completo está em **Ver criativo**.
+
+Por baixo da tabela aparece a soma do custo dos criativos e o budget da
+campanha, por exemplo
+``Custo dos criativos: 1 300,00 €. Budget da campanha: 1 500,00 €.`` Quando
+a soma passa o budget, aparece também um aviso:
+
+.. code-block:: text
+
+   Atenção: o custo dos criativos (1 700,00 €) ultrapassa o budget da campanha (1 500,00 €) em 200,00 €.
+
+O mesmo aviso aparece logo a seguir a criar ou a editar um criativo que faça
+passar o budget, e em **Ver campanha**. O criativo é guardado na mesma: o
+aviso serve para o marketeer ajustar os custos ou pedir mais budget ao
+Administrador.
+
+Um criativo novo fica no estado ``Em preparação``. O número da primeira
+coluna identifica o criativo nas outras opções. Com **0. Voltar** volta-se à
+escolha da campanha, e com Enter nessa pergunta volta-se ao menu do perfil.
+
+Criar criativo
+^^^^^^^^^^^^^^
+
+Pede os dados do criativo, que fica na campanha escolhida. Só o nome é
+obrigatório: os outros dados podem ser indicados mais tarde, em **Editar
+criativo**.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Dado
+     - Regras
+   * - Nome
+     - Obrigatório.
+   * - Descrição
+     - Opcional.
+   * - Custo estimado
+     - Opcional. Valor em euros, por exemplo ``400`` ou ``399,90``.
+   * - Prazo
+     - Opcional, no formato ``AAAA-MM-DD``. Não pode ser depois da data de
+       fim da campanha.
+   * - Público-alvo
+     - Opcional. Texto livre, por exemplo ``Pais de alunos do básico``.
+   * - Plataforma
+     - Opcional. Escolhe-se pelo número, numa lista com Facebook, Instagram,
+       Google Ads, LinkedIn, TikTok e YouTube.
+
+Se algum valor não respeitar as regras, o criativo não é criado.
+
+Editar criativo
+^^^^^^^^^^^^^^^
+
+Só se pode editar um criativo ``Em preparação`` ou ``Rejeitado``. Um
+criativo em revisão está a ser visto pelo cliente, e um aprovado ou publicado
+já foi aceite tal como está.
+
+Pede o número do criativo e mostra cada dado, com o valor atual entre
+parênteses retos. Com Enter, o valor mantém-se; para apagar um valor,
+escreve-se ``-``. As regras são as mesmas de quando se cria o criativo, e se
+algum valor não as respeitar nenhum dado é alterado. Só se podem escolher
+criativos da campanha que está a ser vista.
+
+Ver criativo
+^^^^^^^^^^^^
+
+Pede o número do criativo e mostra todos os dados dele, um por linha,
+incluindo a descrição e o público-alvo completo.
+
+Eliminar criativo
+^^^^^^^^^^^^^^^^^
+
+Pede o número do criativo, mostra os dados dele e pede confirmação. Um
+criativo eliminado não pode ser recuperado. Um criativo ``Publicado`` não
+pode ser eliminado.
+
+Atualizar estado
+^^^^^^^^^^^^^^^^
+
+Pede o número do criativo, mostra o estado atual e as mudanças permitidas a
+partir dele. O caminho normal de um criativo é este:
+
+.. code-block:: text
+
+   Em preparação --> Em revisão --> Aprovado --> Publicado
+                          |
+                          +-------> Rejeitado --> Em preparação ou Em revisão
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Estado atual
+     - O que o marketeer pode fazer
+   * - ``Em preparação``
+     - Enviar ao cliente para revisão.
+   * - ``Em revisão``
+     - Voltar a pôr em preparação. A aprovação e a rejeição são do cliente.
+   * - ``Rejeitado``
+     - Voltar a pôr em preparação, ou enviar outra vez para revisão. O motivo
+       da rejeição aparece no ecrã.
+   * - ``Aprovado``
+     - Marcar como publicado.
+   * - ``Publicado``
+     - Nada: é o estado final.
+
+Com **0. Deixar como está**, o estado não muda.
+
+Anexar ficheiro
+^^^^^^^^^^^^^^^
+
+Pede o número do criativo e o caminho de um ficheiro no computador, por
+exemplo ``C:\Users\ana\Imagens\banner.png``. No Windows, o caminho pode
+ser copiado no Explorador de Ficheiros: botão direito no ficheiro,
+**Copiar como caminho**. As aspas à volta do caminho são ignoradas.
+
+O ficheiro é copiado para a pasta ``ficheiros`` da pasta de dados, por isso
+o original pode depois ser apagado ou mudado de sítio. Cada criativo tem um
+só ficheiro: anexar outro substitui o anterior. Tal como os outros dados, o
+ficheiro só pode ser mudado enquanto o criativo está ``Em preparação`` ou
+``Rejeitado``.
+
+Para experimentar, o projeto tem o ficheiro ``exemplos/banner-natal.svg``.
+
+Pré-visualizar ficheiro
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Pede o número do criativo e mostra o nome, o tipo e o tamanho do ficheiro:
+
+.. code-block:: text
+
+   Ficheiro do criativo Banner de Natal
+     Nome:     banner-natal.svg
+     Tipo:     Imagem (image/svg+xml)
+     Tamanho:  639 bytes
+
+   Abrir o ficheiro no programa predefinido? (s/n)
+
+Com ``s``, o ficheiro abre-se no programa que o sistema usa para esse tipo
+de ficheiro (por exemplo, o browser para um ``.svg``).
 
 Cliente
 -------
@@ -511,19 +696,25 @@ marketeer responsável. Um cliente só vê as suas campanhas.
 
 .. code-block:: text
 
-   N.º  Nome        Início      Fim         Budget      Estado       Marketeer
-   ---  ----------  ----------  ----------  ----------  -----------  ----------------
-   1    Natal 2026  2026-12-01  2026-12-24  1 500,00 €  Por começar  Miguel Marketeer
+   N.º  Nome        Início      Fim         Budget      Estado       Marketeer         Despesa     Restante
+   ---  ----------  ----------  ----------  ----------  -----------  ----------------  ----------  --------
+   1    Natal 2026  2026-12-01  2026-12-24  1 500,00 €  Por começar  Miguel Marketeer  1 300,00 €  200,00 €
 
    1 campanha.
    O budget de cada campanha é definido pelo administrador.
+   A despesa é a soma do custo estimado dos criativos de cada campanha.
 
 Uma campanha que ainda não tem budget atribuído aparece na lista com
 ``Por definir`` na coluna do budget. O cliente não altera o budget.
 
+A despesa e o restante são calculados como no menu do Marketeer: a despesa
+é a soma do custo dos criativos da campanha, e o restante é o budget menos a
+despesa.
+
 **Ver campanha e marketeer responsável** pede o número da campanha e mostra
-todos os dados dela, incluindo o objetivo, e os contactos do marketeer
-responsável:
+todos os dados dela, incluindo o objetivo, a despesa e a parte do budget já
+gasta (por exemplo ``Gasto:     86% do budget``), e os contactos do
+marketeer responsável:
 
 .. code-block:: text
 
@@ -531,3 +722,79 @@ responsável:
      Nome:      Miguel Marketeer
      Email:     marketeer@agencia.pt
      Telefone:  910000002
+
+Criativos
+~~~~~~~~~
+
+Mostra os criativos de todas as campanhas do cliente, numa só lista, com a
+campanha, o custo, o prazo, o público-alvo, a plataforma e o estado de cada
+um. Um cliente só vê os criativos das suas campanhas.
+
+.. code-block:: text
+
+   N.º  Nome             Campanha    Custo     Prazo       Público-alvo               Plataforma  Estado
+   ---  ---------------  ----------  --------  ----------  -------------------------  ----------  -------------
+   1    Banner de Natal  Natal 2026  400,00 €  2026-11-25  Famílias da região de...   Facebook    Em preparação
+   2    Vídeo da montra  Natal 2026  900,00 €  2026-11-28  Jovens adultos, 18 a 3...  Instagram   Em preparação
+
+   2 criativos.
+
+Os criativos aparecem agrupados por campanha. O cliente não altera nada
+nesta lista: os criativos são criados e alterados pelo marketeer.
+
+**Filtrar e pesquisar** faz quatro perguntas, por esta ordem. Com Enter, a
+pergunta não filtra nada:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Pergunta
+     - O que filtra
+   * - Texto a procurar
+     - Criativos com esse texto no nome, na descrição ou no público-alvo, em
+       qualquer posição. Não distingue maiúsculas nem acentos: ``familias``
+       encontra ``Famílias``.
+   * - Campanha
+     - Escolhe-se pelo número, numa lista com as campanhas do cliente.
+   * - Plataforma
+     - Escolhe-se pelo número, numa lista com as seis plataformas.
+   * - Estado
+     - Escolhe-se pelo número, numa lista com os estados de um criativo.
+
+Os criativos que respeitam todos os filtros aparecem com o título
+``Criativos encontrados``. Se nenhum respeitar, aparece
+``Nenhum criativo corresponde aos filtros.`` Depois de Enter, volta a lista
+completa.
+
+**Ver criativo** pede o número do criativo e mostra todos os dados dele,
+incluindo a descrição e o público-alvo completo.
+
+Por baixo da lista aparece quantos criativos estão à espera de aprovação,
+por exemplo ``Há 1 criativo à espera da sua aprovação.``
+
+**Aprovar ou rejeitar criativo** pede o número de um criativo
+``Em revisão``, mostra os dados dele e pergunta a decisão:
+
+.. code-block:: text
+
+   ============================================================
+   Decisão
+   ============================================================
+     1. Aprovar
+     2. Rejeitar
+     0. Decidir mais tarde
+
+Um criativo aprovado pode ser publicado pelo marketeer. Para rejeitar, é
+obrigatório escrever o motivo, que o marketeer vê quando atualiza o estado.
+Com **0. Decidir mais tarde**, o criativo continua em revisão. Os criativos
+noutros estados não podem ser aprovados nem rejeitados.
+
+**Pré-visualizar ficheiro** funciona como no menu do Marketeer: mostra o
+nome, o tipo e o tamanho do ficheiro e pergunta se o deve abrir.
+
+**Descarregar ficheiro** guarda uma cópia do ficheiro numa pasta à escolha.
+Com Enter, a cópia vai para a pasta ``Downloads`` (Transferências) da pasta
+pessoal. Se já houver um ficheiro com o mesmo nome, a cópia fica com um
+número entre parênteses, por exemplo ``banner-natal (1).svg``: nenhum
+ficheiro é apagado.

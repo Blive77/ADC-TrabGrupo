@@ -2,13 +2,15 @@
 
 O marketeer vê as campanhas que lhe estão atribuídas, com o cliente, as
 datas, o budget e o estado, e pode criar, editar, consultar e eliminar
-cada uma.
+cada uma. A lista e os detalhes mostram também a despesa (a soma do custo
+dos criativos) e quanto falta gastar do budget. Ao consultar uma campanha, o
+marketeer vê ainda quantos criativos ela tem em cada estado.
 
 O Administrador vê as campanhas de todos os marketeers, define o budget de
 cada uma e escolhe o marketeer responsável.
 
-O Cliente vê as suas campanhas, com o budget de cada uma, e os contactos do
-marketeer responsável.
+O Cliente vê as suas campanhas, com o budget de cada uma e a despesa face a
+esse budget, e os contactos do marketeer responsável.
 """
 
 from __future__ import annotations
@@ -16,11 +18,11 @@ from __future__ import annotations
 import sqlite3
 from datetime import date
 
-from gestor_campanhas import dinheiro
+from gestor_campanhas import dinheiro, modelos
 from gestor_campanhas.cli import comum
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.modelos import Campanha, Utilizador
-from gestor_campanhas.servicos import campanhas
+from gestor_campanhas.servicos import campanhas, criativos
 
 #: O que se escreve para apagar uma data quando se edita uma campanha.
 APAGAR = "-"
@@ -46,33 +48,64 @@ def budget(campanha: Campanha) -> str:
     return dinheiro.formatar(campanha.budget_centimos)
 
 
-def mostrar_campanhas(lista: list[Campanha]) -> None:
+def restante(campanha: Campanha, gasto: int) -> str:
+    """Escreve quanto falta gastar do budget de uma campanha.
+
+    :param campanha: Campanha a descrever.
+    :param gasto: Despesa da campanha, em cêntimos.
+    :return: O valor em euros (com ``-`` à frente se a despesa passar o
+        budget), ou ``"Por definir"`` se a campanha ainda não tiver budget.
+    """
+    sobra = criativos.restante(campanha, gasto)
+    return "Por definir" if sobra is None else dinheiro.formatar(sobra)
+
+
+def colunas_da_despesa(campanha: Campanha, despesas: dict[int, int]) -> list[str]:
+    """Devolve as colunas ``Despesa`` e ``Restante`` de uma campanha, para as tabelas.
+
+    :param campanha: Campanha a descrever.
+    :param despesas: Despesa de cada campanha, como devolvida por
+        :func:`gestor_campanhas.servicos.criativos.despesas`.
+    :return: A despesa e o restante, já escritos em euros.
+    """
+    gasto = despesas.get(campanha.id, 0)
+    return [dinheiro.formatar(gasto), restante(campanha, gasto)]
+
+
+def mostrar_campanhas(lista: list[Campanha], despesas: dict[int, int] | None = None) -> None:
     """Mostra uma tabela de campanhas, com o total no fim.
 
     :param lista: Campanhas a mostrar.
+    :param despesas: Despesa de cada campanha. Quando é indicada, a tabela
+        ganha as colunas ``Despesa`` e ``Restante``.
     """
-    comum.mostrar_tabela(
-        ["N.º", "Nome", "Cliente", "Início", "Fim", "Budget", "Estado"],
-        [
-            [
-                str(campanha.id),
-                campanha.nome,
-                campanha.cliente_nome,
-                data(campanha.data_inicio),
-                data(campanha.data_fim),
-                budget(campanha),
-                campanhas.estado(campanha),
-            ]
-            for campanha in lista
-        ],
-    )
+    cabecalhos = ["N.º", "Nome", "Cliente", "Início", "Fim", "Budget", "Estado"]
+    if despesas is not None:
+        cabecalhos += ["Despesa", "Restante"]
+    linhas = []
+    for campanha in lista:
+        linha = [
+            str(campanha.id),
+            campanha.nome,
+            campanha.cliente_nome,
+            data(campanha.data_inicio),
+            data(campanha.data_fim),
+            budget(campanha),
+            campanhas.estado(campanha),
+        ]
+        if despesas is not None:
+            linha += colunas_da_despesa(campanha, despesas)
+        linhas.append(linha)
+    comum.mostrar_tabela(cabecalhos, linhas)
     print(f"\n{len(lista)} {'campanha' if len(lista) == 1 else 'campanhas'}.")
 
 
-def mostrar_detalhes(campanha: Campanha) -> None:
+def mostrar_detalhes(campanha: Campanha, gasto: int | None = None) -> None:
     """Mostra todos os dados de uma campanha, um por linha.
 
     :param campanha: Campanha a mostrar.
+    :param gasto: Despesa da campanha, em cêntimos. Quando é indicada,
+        aparecem também a despesa e o budget restante.
     """
     print(f"Campanha n.º {campanha.id}")
     print(f"  Nome:      {campanha.nome}")
@@ -81,7 +114,25 @@ def mostrar_detalhes(campanha: Campanha) -> None:
     print(f"  Início:    {data(campanha.data_inicio)}")
     print(f"  Fim:       {data(campanha.data_fim)}")
     print(f"  Budget:    {budget(campanha)}")
+    if gasto is not None:
+        print(f"  Despesa:   {dinheiro.formatar(gasto)}")
+        print(f"  Restante:  {restante(campanha, gasto)}")
     print(f"  Estado:    {campanhas.estado(campanha)}")
+
+
+def resumo_criativos(ligacao: sqlite3.Connection, campanha: Campanha) -> str:
+    """Escreve quantos criativos uma campanha tem, no total e em cada estado.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param campanha: Campanha a descrever.
+    :return: Por exemplo ``"3 (Em preparação: 2, Em revisão: 1)"``, ou ``"0"``
+        se a campanha não tiver criativos.
+    """
+    por_estado = criativos.contar_por_estado(ligacao, campanha)
+    if not por_estado:
+        return "0"
+    partes = [f"{modelos.NOMES_ESTADOS_CRIATIVO[estado]}: {total}" for estado, total in por_estado.items()]
+    return f"{sum(por_estado.values())} ({', '.join(partes)})"
 
 
 def pedir_campanha(ligacao: sqlite3.Connection, marketeer: Utilizador) -> Campanha | None:
@@ -176,6 +227,8 @@ def editar(ligacao: sqlite3.Connection, marketeer: Utilizador) -> None:
 def ver(ligacao: sqlite3.Connection, marketeer: Utilizador) -> None:
     """Pede o número de uma campanha e mostra todos os dados dela.
 
+    Além dos dados da campanha, mostra quantos criativos ela tem em cada estado.
+
     :param ligacao: Ligação aberta à base de dados.
     :param marketeer: Marketeer que está a consultar.
     """
@@ -183,13 +236,21 @@ def ver(ligacao: sqlite3.Connection, marketeer: Utilizador) -> None:
     campanha = pedir_campanha(ligacao, marketeer)
     if campanha is None:
         return
+    gasto = criativos.despesa(ligacao, campanha)
     print()
-    mostrar_detalhes(campanha)
+    mostrar_detalhes(campanha, gasto)
+    print(f"  Criativos: {resumo_criativos(ligacao, campanha)}")
+    aviso = criativos.aviso_budget(campanha, gasto)
+    if aviso:
+        print(f"\n{aviso}")
     comum.pausa()
 
 
 def eliminar(ligacao: sqlite3.Connection, marketeer: Utilizador) -> None:
     """Pede o número de uma campanha e elimina-a, depois de pedir confirmação.
+
+    Uma campanha com criativos não é eliminada: aparece a mensagem a dizer
+    quantos criativos tem.
 
     :param ligacao: Ligação aberta à base de dados.
     :param marketeer: Marketeer que está a eliminar.
@@ -202,8 +263,12 @@ def eliminar(ligacao: sqlite3.Connection, marketeer: Utilizador) -> None:
     mostrar_detalhes(campanha)
     print("\nUma campanha eliminada não pode ser recuperada.")
     if comum.confirmar("Eliminar esta campanha?"):
-        campanhas.eliminar(ligacao, marketeer, campanha.id)
-        print(f"\nA campanha {campanha.nome} foi eliminada.")
+        try:
+            campanhas.eliminar(ligacao, marketeer, campanha.id)
+        except ErroValidacao as erro:
+            print(f"\n{erro}")
+        else:
+            print(f"\nA campanha {campanha.nome} foi eliminada.")
     else:
         print("\nNada foi alterado.")
     comum.pausa()
@@ -235,7 +300,7 @@ def do_marketeer(ligacao: sqlite3.Connection, utilizador: Utilizador) -> None:
         comum.titulo("As minhas campanhas")
         lista = campanhas.listar_do_marketeer(ligacao, utilizador)
         if lista:
-            mostrar_campanhas(lista)
+            mostrar_campanhas(lista, criativos.despesas(ligacao))
         else:
             print("Ainda não tem campanhas.")
         escolha = comum.escolher_opcao("Campanhas", menu)
@@ -371,34 +436,40 @@ def do_administrador(ligacao: sqlite3.Connection, utilizador: Utilizador) -> Non
         funcao(ligacao)
 
 
-def mostrar_do_cliente(lista: list[Campanha]) -> None:
+def mostrar_do_cliente(lista: list[Campanha], despesas: dict[int, int] | None = None) -> None:
     """Mostra uma tabela com as campanhas de um cliente, com o total no fim.
 
     :param lista: Campanhas a mostrar.
+    :param despesas: Despesa de cada campanha. Quando é indicada, a tabela
+        ganha as colunas ``Despesa`` e ``Restante``.
     """
-    comum.mostrar_tabela(
-        ["N.º", "Nome", "Início", "Fim", "Budget", "Estado", "Marketeer"],
-        [
-            [
-                str(campanha.id),
-                campanha.nome,
-                data(campanha.data_inicio),
-                data(campanha.data_fim),
-                budget(campanha),
-                campanhas.estado(campanha),
-                campanha.marketeer_nome,
-            ]
-            for campanha in lista
-        ],
-    )
+    cabecalhos = ["N.º", "Nome", "Início", "Fim", "Budget", "Estado", "Marketeer"]
+    if despesas is not None:
+        cabecalhos += ["Despesa", "Restante"]
+    linhas = []
+    for campanha in lista:
+        linha = [
+            str(campanha.id),
+            campanha.nome,
+            data(campanha.data_inicio),
+            data(campanha.data_fim),
+            budget(campanha),
+            campanhas.estado(campanha),
+            campanha.marketeer_nome,
+        ]
+        if despesas is not None:
+            linha += colunas_da_despesa(campanha, despesas)
+        linhas.append(linha)
+    comum.mostrar_tabela(cabecalhos, linhas)
     print(f"\n{len(lista)} {'campanha' if len(lista) == 1 else 'campanhas'}.")
 
 
 def ver_do_cliente(ligacao: sqlite3.Connection, cliente: Utilizador) -> None:
     """Pede o número de uma campanha do cliente e mostra os dados dela.
 
-    Além dos dados da campanha, mostra o nome e os contactos do marketeer
-    responsável, para o cliente saber a quem se dirigir.
+    Além dos dados da campanha, com a despesa e a parte do budget já
+    gasta, mostra o nome e os contactos do marketeer responsável, para o
+    cliente saber a quem se dirigir.
 
     :param ligacao: Ligação aberta à base de dados.
     :param cliente: Cliente que está a consultar.
@@ -414,8 +485,11 @@ def ver_do_cliente(ligacao: sqlite3.Connection, cliente: Utilizador) -> None:
         comum.pausa()
         return
     marketeer = campanhas.responsavel(ligacao, campanha)
+    gasto = criativos.despesa(ligacao, campanha)
     print()
-    mostrar_detalhes(campanha)
+    mostrar_detalhes(campanha, gasto)
+    if campanha.budget_centimos:
+        print(f"  Gasto:     {gasto * 100 // campanha.budget_centimos}% do budget")
     print("\nMarketeer responsável")
     print(f"  Nome:      {marketeer.nome}")
     print(f"  Email:     {marketeer.email}")
@@ -437,8 +511,9 @@ def do_cliente(ligacao: sqlite3.Connection, utilizador: Utilizador) -> None:
         comum.titulo("As minhas campanhas")
         lista = campanhas.listar_do_cliente(ligacao, utilizador)
         if lista:
-            mostrar_do_cliente(lista)
+            mostrar_do_cliente(lista, criativos.despesas(ligacao))
             print("O budget de cada campanha é definido pelo administrador.")
+            print("A despesa é a soma do custo estimado dos criativos de cada campanha.")
         else:
             print('Ainda não tem campanhas. Pode pedir uma na opção "Pedidos de campanha".')
         escolha = comum.escolher_opcao("Campanhas", [("1", "Ver campanha e marketeer responsável"), ("0", "Voltar")])

@@ -9,6 +9,7 @@ from gestor_campanhas.cli import campanhas as menu
 from gestor_campanhas.cli import perfis
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import campanhas as repositorio
+from gestor_campanhas.repositorios import criativos
 from gestor_campanhas.repositorios import utilizadores
 from gestor_campanhas.servicos import campanhas as servico
 from tests.conftest import PASSWORD_TESTE
@@ -393,6 +394,54 @@ def test_menu_mostra_os_detalhes_de_uma_campanha(teclado, ligacao, contas, natal
     assert "  Estado:    Por começar" in saida
 
 
+def test_menu_mostra_os_criativos_por_estado(teclado, ligacao, contas, natal, dia_16_de_novembro, capsys):
+    banner = criativos.criar(ligacao, natal.id, "Banner", "")
+    criativos.criar(ligacao, natal.id, "Vídeo", "")
+    criativos.criar(ligacao, natal.id, "Cartaz", "")
+    criativos.definir_estado(ligacao, banner.id, modelos.EM_REVISAO)
+    teclado("3", str(natal.id), "", "0")
+
+    menu.do_marketeer(ligacao, contas[modelos.MARKETEER])
+
+    assert "  Criativos: 3 (Em preparação: 2, Em revisão: 1)" in capsys.readouterr().out
+
+
+def test_lista_mostra_a_despesa_e_o_restante(teclado, ligacao, contas, natal, dia_16_de_novembro, capsys):
+    miguel = contas[modelos.MARKETEER]
+    repositorio.definir_budget(ligacao, natal.id, 150000)
+    criativos.criar(ligacao, natal.id, "Banner", "", 40000)
+    criativos.criar(ligacao, natal.id, "Vídeo", "", 90000)
+    servico.criar(ligacao, miguel, "Saldos", "", contas[modelos.CLIENTE].id)
+    teclado("0")
+
+    menu.do_marketeer(ligacao, miguel)
+
+    saida = capsys.readouterr().out
+    assert "Budget       Estado       Despesa     Restante" in saida
+    assert "1 500,00 €   Por começar  1 300,00 €  200,00 €" in saida
+    assert "Por definir  Em curso     0,00 €      Por definir" in saida
+
+
+def test_detalhes_mostram_a_despesa_e_o_restante(teclado, ligacao, contas, natal, dia_16_de_novembro, capsys):
+    repositorio.definir_budget(ligacao, natal.id, 150000)
+    criativos.criar(ligacao, natal.id, "Banner", "", 170000)
+    teclado("3", str(natal.id), "", "0")
+
+    menu.do_marketeer(ligacao, contas[modelos.MARKETEER])
+
+    saida = capsys.readouterr().out
+    assert "  Despesa:   1 700,00 €" in saida
+    assert "  Restante:  -200,00 €" in saida
+
+
+def test_menu_mostra_zero_criativos(teclado, ligacao, contas, natal, dia_16_de_novembro, capsys):
+    teclado("3", str(natal.id), "", "0")
+
+    menu.do_marketeer(ligacao, contas[modelos.MARKETEER])
+
+    assert "  Criativos: 0" in capsys.readouterr().out
+
+
 def test_detalhes_mostram_um_traco_quando_nao_ha_objetivo(ligacao, contas, capsys):
     campanha = servico.criar(ligacao, contas[modelos.MARKETEER], "Natal", "", contas[modelos.CLIENTE].id)
 
@@ -472,6 +521,37 @@ def test_menu_eliminar_pode_ser_cancelado_com_enter(teclado, ligacao, contas, na
 
     menu.do_marketeer(ligacao, contas[modelos.MARKETEER])
 
+    assert repositorio.obter_por_id(ligacao, natal.id) == natal
+
+
+def test_nao_elimina_uma_campanha_com_criativos(ligacao, contas, natal):
+    criativos.criar(ligacao, natal.id, "Banner", "")
+    criativos.criar(ligacao, natal.id, "Vídeo", "")
+
+    with pytest.raises(ErroValidacao, match="A campanha Natal tem 2 criativos. Elimine primeiro os criativos"):
+        servico.eliminar(ligacao, contas[modelos.MARKETEER], natal.id)
+
+    assert repositorio.obter_por_id(ligacao, natal.id) == natal
+
+
+def test_elimina_a_campanha_depois_de_eliminar_os_criativos(ligacao, contas, natal):
+    banner = criativos.criar(ligacao, natal.id, "Banner", "")
+    criativos.eliminar(ligacao, banner.id)
+
+    servico.eliminar(ligacao, contas[modelos.MARKETEER], natal.id)
+
+    assert repositorio.obter_por_id(ligacao, natal.id) is None
+
+
+def test_menu_explica_porque_nao_elimina_campanha_com_criativos(teclado, ligacao, contas, natal, capsys):
+    criativos.criar(ligacao, natal.id, "Banner", "")
+    teclado("4", str(natal.id), "s", "", "0")
+
+    menu.do_marketeer(ligacao, contas[modelos.MARKETEER])
+
+    saida = capsys.readouterr().out
+    assert 'A campanha Natal tem 1 criativo. Elimine primeiro os criativos, na opção "Criativos".' in saida
+    assert "foi eliminada" not in saida
     assert repositorio.obter_por_id(ligacao, natal.id) == natal
 
 
