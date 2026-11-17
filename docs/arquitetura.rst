@@ -15,7 +15,7 @@ Estrutura de pastas
      __main__.py          ponto de entrada (python -m gestor_campanhas)
      config.py            caminhos da pasta de dados e da base de dados
      bd.py                ligação SQLite e criação das tabelas
-     modelos.py           classes de dados (Utilizador, Campanha, PedidoCampanha, Criativo), perfis e estados
+     modelos.py           classes de dados (Utilizador, Campanha, PedidoCampanha), perfis e estados
      erros.py             erros que os menus mostram ao utilizador
      relogio.py           data e hora atuais
      seguranca.py         hash das passwords
@@ -30,17 +30,12 @@ Estrutura de pastas
        admin.py           opções do menu do Administrador
        gestao.py          gestão de clientes e marketeers, pelo Administrador
        campanhas.py       campanhas, nos menus dos três perfis
-       criativos.py       criativos, nos menus do Marketeer e do Cliente
        pedidos.py         pedidos de campanha, nos menus do Cliente e do Administrador
        conta.py           opções da conta, comuns a todos os perfis
        recuperacao.py     recuperação da password
-   exemplos/              ficheiros para experimentar a aplicação
    tests/                 testes automáticos (pytest)
    docs/                  esta documentação (Sphinx)
    dados/                 criada no primeiro arranque; não vai para o Git
-     app.db               base de dados
-     caixa_saida/         emails "enviados"
-     ficheiros/           ficheiros dos criativos, uma pasta por criativo
 
 Camadas
 -------
@@ -147,8 +142,8 @@ campanhas por terminar. A verificação está em
 Dinheiro
 --------
 
-Os valores em euros (o budget de uma campanha, o orçamento de um pedido e
-o custo de um criativo) são guardados em cêntimos, como números inteiros. O módulo
+Os valores em euros (o budget de uma campanha e o orçamento de um pedido)
+são guardados em cêntimos, como números inteiros. O módulo
 :mod:`gestor_campanhas.dinheiro` converte o que o utilizador escreve em
 cêntimos e os cêntimos no texto que é mostrado.
 
@@ -233,66 +228,3 @@ executadas em todos os arranques sem apagar dados.
        cêntimos, prazo, plataformas, estado (``pendente``, ``em_analise``,
        ``aprovado``, ``rejeitado`` ou ``cancelado``), motivo da rejeição e
        campanha a que deu origem.
-   * - ``criativos``
-     - Uma linha por criativo: campanha a que pertence, nome, descrição,
-       custo em cêntimos, prazo, público-alvo, plataforma, estado
-       (``em_preparacao``, ``em_revisao``, ``aprovado``, ``rejeitado`` ou
-       ``publicado``), motivo da rejeição e nome do ficheiro anexado. A
-       tabela é criada logo com todas as colunas; as que ainda não estão em
-       uso ficam vazias.
-
-Uma campanha com criativos não pode ser apagada: a coluna ``campanha_id`` da
-tabela ``criativos`` aponta para ela, e o SQLite recusa apagar uma linha a
-que outra tabela ainda faz referência. A regra está também em
-:func:`gestor_campanhas.servicos.campanhas.eliminar`, que mostra uma
-mensagem a explicar o que fazer.
-
-Estados de um criativo
-----------------------
-
-As mudanças de estado que o marketeer pode fazer estão no dicionário
-:data:`gestor_campanhas.servicos.criativos.PROXIMOS_ESTADOS`: a chave é o
-estado atual e o valor são os estados para onde pode passar. O menu "Atualizar
-estado" mostra só essas opções, e
-:func:`gestor_campanhas.servicos.criativos.mudar_estado` recusa qualquer
-outra. A aprovação e a rejeição são do cliente, em
-:func:`gestor_campanhas.servicos.criativos.aprovar` e
-:func:`gestor_campanhas.servicos.criativos.rejeitar`, e só valem para
-criativos em revisão.
-
-Ter as regras num dicionário, em vez de espalhadas por vários ``if``, faz com
-que acrescentar ou retirar uma mudança seja alterar uma linha.
-
-Ficheiros dos criativos
------------------------
-
-A tabela ``criativos`` guarda só o nome do ficheiro anexado. O ficheiro em si
-fica em ``ficheiros/<número do criativo>/``, dentro da pasta de dados (ver
-:func:`gestor_campanhas.config.pasta_ficheiros`). Guardar uma cópia, em vez
-do caminho do original, faz com que o ficheiro continue disponível mesmo que
-o original seja apagado ou mudado de sítio.
-
-O módulo :mod:`gestor_campanhas.servicos.ficheiros` trata só dos ficheiros:
-copia-os, descreve-os, abre-os e apaga-os. As regras sobre quem pode anexar e
-quando estão em :mod:`gestor_campanhas.servicos.criativos`. Quando um
-criativo é eliminado, a pasta dele também é apagada.
-
-Os testes nunca mexem na pasta ``dados`` do projeto: a *fixture*
-``dados_temporarios``, em ``tests/conftest.py``, põe a pasta de dados numa
-pasta temporária em todos os testes, e a *fixture* ``aberturas`` substitui a
-abertura de ficheiros, para não aparecerem janelas.
-
-Despesa e budget restante
--------------------------
-
-A despesa de uma campanha não é guardada: é calculada sempre que é precisa,
-somando o custo dos criativos. Assim, nunca fica desatualizada quando um
-criativo muda de custo ou é eliminado. Para as listas, que mostram várias
-campanhas, :func:`gestor_campanhas.servicos.criativos.despesas` faz uma só
-consulta com ``GROUP BY`` e devolve a despesa de todas as campanhas de uma
-vez, em vez de uma consulta por campanha.
-
-O aviso de budget ultrapassado é preparado por
-:func:`gestor_campanhas.servicos.criativos.aviso_budget` e mostrado pelos
-menus. Não impede guardar o criativo: o custo é uma estimativa, e cabe ao
-marketeer e ao Administrador decidir o que fazer.
