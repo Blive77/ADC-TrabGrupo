@@ -309,3 +309,26 @@ O aviso de budget ultrapassado é preparado por
 :func:`gestor_campanhas.servicos.criativos.aviso_budget` e mostrado pelos
 menus. Não impede guardar o criativo: o custo é uma estimativa, e cabe ao
 marketeer e ao Administrador decidir o que fazer.
+
+Pedidos de alteração de budget
+------------------------------
+
+Um pedido de alteração de budget usa os mesmos estados de um pedido de
+campanha, mas quem o faz avançar é diferente:
+
+.. code-block:: text
+
+   Pendente --(parecer do marketeer)--> Em análise
+      |
+      +--(o cliente cancela)--> Cancelado
+
+O parecer é guardado no próprio pedido, nas colunas ``parecer_viavel`` e
+``parecer_justificacao``. Enquanto o pedido estiver por decidir, o marketeer
+pode dar outro parecer, que substitui o anterior:
+:func:`gestor_campanhas.servicos.budget.dar_parecer` só recusa pedidos já
+decididos ou cancelados.
+
+O marketeer que vê o pedido é sempre o responsável atual pela campanha: as
+consultas de :mod:`gestor_campanhas.repositorios.pedidos_budget` vão buscar o
+marketeer à tabela ``campanhas``, e não guardam uma cópia no pedido. Se a
+campanha mudar de marketeer, os pedidos mudam com ela.
