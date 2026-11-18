@@ -8,8 +8,10 @@ from gestor_campanhas import config, dados_demo, modelos, relogio, seguranca
 from gestor_campanhas.cli import budget as menu
 from gestor_campanhas.cli import campanhas as menu_campanhas
 from gestor_campanhas.cli import pedidos as menu_pedidos
+from gestor_campanhas.cli import perfis
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
+from gestor_campanhas.repositorios import criativos as criativos_bd
 from gestor_campanhas.repositorios import pedidos_budget as repositorio
 from gestor_campanhas.repositorios import utilizadores
 from gestor_campanhas.servicos import budget as servico
@@ -371,6 +373,96 @@ def test_lista_do_marketeer_mostra_primeiro_os_por_decidir(ligacao, contas, nata
     novo = repositorio.criar(ligacao, natal.id, 150000, 180000, "Novo")
 
     assert [p.id for p in servico.listar_do_marketeer(ligacao, miguel)] == [do_jose.id, novo.id, antigo.id]
+
+
+# --- menu do marketeer -------------------------------------------------------
+
+
+def test_opcao_pedidos_de_budget_esta_no_menu_do_marketeer():
+    opcoes = perfis.OPCOES[modelos.MARKETEER]
+
+    assert [descricao for descricao, _ in opcoes][:3] == ["Campanhas", "Criativos", "Pedidos de budget"]
+    assert dict(opcoes)["Pedidos de budget"] is menu.do_marketeer
+
+
+def test_menu_do_marketeer_sem_pedidos(teclado, ligacao, marta, capsys):
+    teclado("0")
+
+    menu.do_marketeer(ligacao, marta)
+
+    saida = capsys.readouterr().out
+    assert "Pedidos de alteração de budget das minhas campanhas" in saida
+    assert "Ainda não há pedidos de alteração de budget nas suas campanhas." in saida
+    assert "1. Dar parecer" in saida
+
+
+def test_menu_do_marketeer_mostra_os_pedidos_das_suas_campanhas(teclado, ligacao, contas, pedido, capsys):
+    teclado("0")
+
+    menu.do_marketeer(ligacao, contas[modelos.MARKETEER])
+
+    saida = capsys.readouterr().out
+    assert "N.º  Feito em    Campanha    Cliente        De          Para        Estado    Parecer" in saida
+    assert f"{pedido.id}    2026-11-18  Natal 2026  Carla Cliente  1 500,00 €  2 000,00 €  Pendente  Por dar" in saida
+    assert "1 pedido, 1 por decidir." in saida
+
+
+def test_menu_do_marketeer_guarda_o_parecer(teclado, ligacao, contas, pedido, capsys):
+    teclado("1", str(pedido.id), "s", "Há margem para mais vídeo", "", "0")
+
+    menu.do_marketeer(ligacao, contas[modelos.MARKETEER])
+
+    saida = capsys.readouterr().out
+    assert "  Cliente:      Carla Cliente" in saida
+    assert "  Parecer:      Por dar" in saida
+    assert "Despesa atual da campanha: 0,00 €." in saida
+    assert "Parecer guardado. O pedido fica em análise, à espera da decisão do administrador." in saida
+    assert f"{pedido.id}    2026-11-18  Natal 2026  Carla Cliente  1 500,00 €  2 000,00 €  Em análise  Viável" in saida
+    guardado = repositorio.obter_por_id(ligacao, pedido.id)
+    assert guardado.parecer_viavel is True
+    assert guardado.parecer_justificacao == "Há margem para mais vídeo"
+
+
+def test_menu_do_marketeer_mostra_a_despesa_da_campanha(teclado, ligacao, contas, pedido, natal, capsys):
+    criativos_bd.criar(ligacao, natal.id, "Banner", "", 40000, None, "", "")
+    teclado(str(pedido.id), "n", "Não há criativos para isso", "")
+
+    menu.dar_parecer(ligacao, contas[modelos.MARKETEER])
+
+    assert "Despesa atual da campanha: 400,00 €." in capsys.readouterr().out
+    assert repositorio.obter_por_id(ligacao, pedido.id).parecer_viavel is False
+
+
+def test_menu_avisa_que_o_parecer_novo_substitui_o_anterior(teclado, ligacao, contas, pedido, capsys):
+    servico.dar_parecer(ligacao, contas[modelos.MARKETEER], pedido.id, True, "Há margem")
+    teclado(str(pedido.id), "n", "Mudei de ideias", "")
+
+    menu.dar_parecer(ligacao, contas[modelos.MARKETEER])
+
+    saida = capsys.readouterr().out
+    assert "  Parecer:      Viável" in saida
+    assert "  Justificação: Há margem" in saida
+    assert "Já deu parecer sobre este pedido. O parecer novo substitui o anterior." in saida
+    assert repositorio.obter_por_id(ligacao, pedido.id).parecer_justificacao == "Mudei de ideias"
+
+
+def test_menu_nao_pede_parecer_a_um_pedido_decidido(teclado, ligacao, contas, pedido, capsys):
+    repositorio.definir_estado(ligacao, pedido.id, modelos.CANCELADO)
+    teclado(str(pedido.id), "")
+
+    menu.dar_parecer(ligacao, contas[modelos.MARKETEER])
+
+    saida = capsys.readouterr().out
+    assert "Este pedido já não aceita parecer." in saida
+    assert "O pedido é viável?" not in saida
+
+
+def test_menu_nao_mostra_pedidos_de_outro_marketeer(teclado, ligacao, pedido, marta, capsys):
+    teclado(str(pedido.id), "")
+
+    menu.dar_parecer(ligacao, marta)
+
+    assert f"Não há nenhum pedido de budget com o número {pedido.id} nas suas campanhas." in capsys.readouterr().out
 
 
 # --- menu do cliente ---------------------------------------------------------
