@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 import pytest
 
-from gestor_campanhas import modelos, relogio
+from gestor_campanhas import modelos, relogio, seguranca
 from gestor_campanhas.cli import budget as menu
 from gestor_campanhas.cli import campanhas as menu_campanhas
 from gestor_campanhas.cli import perfis
@@ -12,9 +12,11 @@ from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import alteracoes_budget as historico_bd
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
 from gestor_campanhas.repositorios import pedidos_budget as pedidos_bd
+from gestor_campanhas.repositorios import utilizadores
 from gestor_campanhas.servicos import budget as servico
 from gestor_campanhas.servicos import campanhas
 from gestor_campanhas.servicos import pedidos as servico_pedidos
+from tests.conftest import PASSWORD_TESTE
 
 
 @pytest.fixture(autouse=True)
@@ -379,3 +381,55 @@ def test_menu_mostra_o_erro_da_aprovacao(teclado, ligacao, natal, pedido, capsys
     menu.decidir(ligacao)
 
     assert "Este pedido já não altera nada: rejeite-o, indicando o motivo. O pedido não foi aprovado." in capsys.readouterr().out
+
+
+# --- histórico do budget nos menus -------------------------------------------
+
+
+def test_cliente_ve_o_historico_do_budget(teclado, ligacao, contas, natal, pedido, capsys):
+    historico_bd.registar(ligacao, natal.id, None, 150000, "Budget inicial")
+    servico.aprovar(ligacao, pedido.id)
+    teclado("2", str(natal.id), "", "0")
+
+    menu_campanhas.do_cliente(ligacao, contas[modelos.CLIENTE])
+
+    saida = capsys.readouterr().out
+    assert "2. Histórico do budget" in saida
+    assert "Campanha Natal 2026. Budget atual: 2 000,00 €." in saida
+    assert "Data              De           Para        Motivo" in saida
+    assert "2026-11-18 10:00  Por definir  1 500,00 €  Budget inicial" in saida
+    assert (
+        f"2026-11-18 10:00  1 500,00 €   2 000,00 €  Pedido de budget n.º {pedido.id}: Mais anúncios em vídeo" in saida
+    )
+    assert "2 alterações." in saida
+
+
+def test_historico_vazio_diz_que_nao_ha_alteracoes(teclado, ligacao, contas, natal, capsys):
+    teclado(str(natal.id), "")
+
+    menu_campanhas.historico_do_cliente(ligacao, contas[modelos.CLIENTE])
+
+    assert "Não há alterações do budget registadas para esta campanha." in capsys.readouterr().out
+
+
+def test_cliente_nao_ve_o_historico_de_campanhas_de_outro(teclado, ligacao, contas, natal, capsys):
+    jose = utilizadores.criar(
+        ligacao, "José Padeiro", "jose@padaria.pt", seguranca.gerar_hash(PASSWORD_TESTE), modelos.CLIENTE
+    )
+    teclado(str(natal.id), "")
+
+    menu_campanhas.historico_do_cliente(ligacao, jose)
+
+    assert f"Não tem nenhuma campanha com o número {natal.id}." in capsys.readouterr().out
+
+
+def test_administrador_ve_o_historico_de_qualquer_campanha(teclado, ligacao, contas, natal, capsys):
+    campanhas.definir_budget(ligacao, natal.id, "1800", "Desconto do fornecedor")
+    teclado("3", str(natal.id), "", "0")
+
+    menu_campanhas.do_administrador(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    assert "3. Histórico do budget" in saida
+    assert "2026-11-18 10:00  1 500,00 €  1 800,00 €  Desconto do fornecedor" in saida
+    assert "1 alteração." in saida

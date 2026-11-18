@@ -11,6 +11,10 @@ cada uma e escolhe o marketeer responsável.
 
 O Cliente vê as suas campanhas, com o budget de cada uma e a despesa face a
 esse budget, e os contactos do marketeer responsável.
+
+O Administrador e o Cliente veem também o histórico do budget de cada
+campanha: o valor anterior, o valor novo, a data e o motivo de cada
+alteração.
 """
 
 from __future__ import annotations
@@ -409,11 +413,53 @@ def atribuir_marketeer(ligacao: sqlite3.Connection) -> None:
     comum.pausa()
 
 
+def mostrar_historico(ligacao: sqlite3.Connection, campanha: Campanha) -> None:
+    """Mostra o histórico do budget de uma campanha: uma linha por alteração, da mais antiga para a mais recente.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param campanha: Campanha a consultar.
+    """
+    print(f"\nCampanha {campanha.nome}. Budget atual: {budget(campanha)}.\n")
+    lista = campanhas.historico_budget(ligacao, campanha)
+    if not lista:
+        print("Não há alterações do budget registadas para esta campanha.")
+        return
+    comum.mostrar_tabela(
+        ["Data", "De", "Para", "Motivo"],
+        [
+            [
+                alteracao.alterado_em.strftime("%Y-%m-%d %H:%M"),
+                "Por definir"
+                if alteracao.budget_anterior_centimos is None
+                else dinheiro.formatar(alteracao.budget_anterior_centimos),
+                dinheiro.formatar(alteracao.budget_novo_centimos),
+                alteracao.motivo,
+            ]
+            for alteracao in lista
+        ],
+    )
+    print(f"\n{len(lista)} {'alteração' if len(lista) == 1 else 'alterações'}.")
+
+
+def historico(ligacao: sqlite3.Connection) -> None:
+    """Pede o número de uma campanha, seja de que marketeer for, e mostra o histórico do budget dela.
+
+    :param ligacao: Ligação aberta à base de dados.
+    """
+    comum.titulo("Histórico do budget")
+    campanha = pedir_qualquer_campanha(ligacao)
+    if campanha is None:
+        return
+    mostrar_historico(ligacao, campanha)
+    comum.pausa()
+
+
 #: Opções do menu de campanhas do Administrador. Cada opção é um par
 #: ``(descrição, função)``; a função recebe a ligação à base de dados.
 ACOES_DO_ADMINISTRADOR = [
     ("Definir budget", definir_budget),
     ("Atribuir marketeer", atribuir_marketeer),
+    ("Histórico do budget", historico),
 ]
 
 
@@ -503,12 +549,33 @@ def ver_do_cliente(ligacao: sqlite3.Connection, cliente: Utilizador) -> None:
     comum.pausa()
 
 
+def historico_do_cliente(ligacao: sqlite3.Connection, cliente: Utilizador) -> None:
+    """Pede o número de uma campanha do cliente e mostra o histórico do budget dela.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param cliente: Cliente que está a consultar.
+    """
+    comum.titulo("Histórico do budget")
+    numero = comum.ler_numero("Número da campanha (Enter para cancelar)")
+    if numero is None:
+        return
+    try:
+        campanha = campanhas.obter_do_cliente(ligacao, cliente, numero)
+    except ErroValidacao as erro:
+        print(f"\n{erro}")
+        comum.pausa()
+        return
+    mostrar_historico(ligacao, campanha)
+    comum.pausa()
+
+
 def do_cliente(ligacao: sqlite3.Connection, utilizador: Utilizador) -> None:
     """Opção "Campanhas" do menu do Cliente.
 
     Mostra as campanhas do cliente, com o budget de cada uma, e deixa ver os
-    detalhes de cada campanha, com os contactos do marketeer responsável. O
-    cliente não altera nada aqui: o budget é definido pelo Administrador.
+    detalhes de cada campanha, com os contactos do marketeer responsável, e
+    o histórico do budget. O cliente não altera nada aqui: o budget é
+    definido pelo Administrador.
 
     :param ligacao: Ligação aberta à base de dados.
     :param utilizador: Cliente que está a usar o menu.
@@ -523,7 +590,12 @@ def do_cliente(ligacao: sqlite3.Connection, utilizador: Utilizador) -> None:
             print("A despesa é a soma do custo estimado dos criativos de cada campanha.")
         else:
             print('Ainda não tem campanhas. Pode pedir uma na opção "Pedidos de campanha".')
-        escolha = comum.escolher_opcao("Campanhas", [("1", "Ver campanha e marketeer responsável"), ("0", "Voltar")])
+        escolha = comum.escolher_opcao(
+            "Campanhas", [("1", "Ver campanha e marketeer responsável"), ("2", "Histórico do budget"), ("0", "Voltar")]
+        )
         if escolha == "0":
             return
-        ver_do_cliente(ligacao, utilizador)
+        if escolha == "1":
+            ver_do_cliente(ligacao, utilizador)
+        else:
+            historico_do_cliente(ligacao, utilizador)
