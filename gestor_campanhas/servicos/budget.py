@@ -8,6 +8,10 @@ O marketeer responsável pela campanha dá o seu parecer: diz se o pedido é
 viável e porquê. Com o parecer, o pedido passa a estar em análise e o cliente
 deixa de o poder cancelar.
 
+Depois do parecer, o Administrador decide. Se aprovar, o budget da campanha
+passa a ser o valor pedido e a alteração fica no histórico do budget; se
+rejeitar, indica o motivo.
+
 Cada campanha só pode ter um pedido de cada vez à espera de decisão, para
 não haver dois valores pedidos ao mesmo tempo para o mesmo budget.
 """
@@ -16,7 +20,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from gestor_campanhas import modelos, relogio
+from gestor_campanhas import dinheiro, modelos, relogio
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.modelos import Campanha, PedidoBudget, Utilizador
 from gestor_campanhas.repositorios import pedidos_budget
@@ -177,3 +181,80 @@ def dar_parecer(
     if not justificacao:
         raise ErroValidacao("A justificação do parecer não pode ficar vazia.")
     return pedidos_budget.definir_parecer(ligacao, pedido.id, viavel, justificacao, modelos.EM_ANALISE)
+
+
+def listar_todos(ligacao: sqlite3.Connection) -> list[PedidoBudget]:
+    """Lista os pedidos de alteração de budget de todas as campanhas, para o Administrador.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :return: Primeiro os pedidos por decidir, depois os já decididos ou
+        cancelados; dentro de cada grupo, do mais antigo para o mais recente.
+    """
+    todos = pedidos_budget.listar_todos(ligacao)
+    return sorted(todos, key=lambda pedido: (pedido.estado not in POR_DECIDIR, pedido.id))
+
+
+def obter(ligacao: sqlite3.Connection, identificador: int) -> PedidoBudget:
+    """Procura um pedido de alteração de budget pelo número, seja de que campanha for.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param identificador: Número do pedido.
+    :return: O pedido.
+    :raises ErroValidacao: Se não existir nenhum pedido de budget com esse número.
+    """
+    pedido = pedidos_budget.obter_por_id(ligacao, identificador)
+    if pedido is None:
+        raise ErroValidacao(f"Não existe nenhum pedido de budget com o número {identificador}.")
+    return pedido
+
+
+def _para_decidir(ligacao: sqlite3.Connection, identificador: int) -> PedidoBudget:
+    """Devolve um pedido, confirmando que está por decidir e já tem o parecer do marketeer."""
+    pedido = obter(ligacao, identificador)
+    if pedido.estado not in POR_DECIDIR:
+        raise ErroValidacao(f"Este pedido já não pode ser decidido: está no estado {pedido.nome_estado}.")
+    if pedido.parecer_viavel is None:
+        raise ErroValidacao("Este pedido ainda não tem o parecer do marketeer. Só pode ser decidido depois do parecer.")
+    return pedido
+
+
+def aprovar(ligacao: sqlite3.Connection, identificador: int) -> PedidoBudget:
+    """Aprova um pedido de alteração de budget e altera o budget da campanha.
+
+    O budget da campanha passa a ser o valor pedido. A alteração fica no
+    histórico do budget, com o número e o motivo do pedido.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param identificador: Número do pedido.
+    :return: O pedido, já aprovado.
+    :raises ErroValidacao: Se o pedido não existir, se já tiver sido decidido
+        ou cancelado, se ainda não tiver parecer, ou se a campanha já tiver o
+        budget pedido. Nesse caso nada é alterado.
+    """
+    pedido = _para_decidir(ligacao, identificador)
+    campanha = campanhas.obter(ligacao, pedido.campanha_id)
+    if campanha.budget_centimos == pedido.budget_pedido_centimos:
+        raise ErroValidacao(
+            f"O budget da campanha já é {dinheiro.formatar(campanha.budget_centimos)}. "
+            "Este pedido já não altera nada: rejeite-o, indicando o motivo."
+        )
+    motivo = f"Pedido de budget n.º {pedido.id}: {pedido.motivo}"
+    campanhas.alterar_budget(ligacao, campanha, pedido.budget_pedido_centimos, motivo, pedido.id)
+    return pedidos_budget.decidir(ligacao, pedido.id, modelos.APROVADO)
+
+
+def rejeitar(ligacao: sqlite3.Connection, identificador: int, motivo: str) -> PedidoBudget:
+    """Rejeita um pedido de alteração de budget, indicando o motivo. O budget não muda.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param identificador: Número do pedido.
+    :param motivo: Porque é que o pedido não é aceite. Obrigatório.
+    :return: O pedido, já rejeitado.
+    :raises ErroValidacao: Se o pedido não existir, se já tiver sido decidido
+        ou cancelado, se ainda não tiver parecer, ou se o motivo ficar vazio.
+    """
+    pedido = _para_decidir(ligacao, identificador)
+    motivo = motivo.strip()
+    if not motivo:
+        raise ErroValidacao("O motivo da rejeição não pode ficar vazio.")
+    return pedidos_budget.decidir(ligacao, pedido.id, modelos.REJEITADO, motivo)

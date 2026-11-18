@@ -10,6 +10,7 @@ from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import alteracoes_budget as historico_bd
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
 from gestor_campanhas.repositorios import pedidos_budget as pedidos_bd
+from gestor_campanhas.servicos import budget as servico
 from gestor_campanhas.servicos import campanhas
 from gestor_campanhas.servicos import pedidos as servico_pedidos
 
@@ -162,3 +163,98 @@ def test_menu_nao_pede_o_motivo_do_primeiro_budget(teclado, ligacao, contas, sal
 
     assert "Budget definido: 800,00 €." in capsys.readouterr().out
     assert campanhas.historico_budget(ligacao, saldos)[0].motivo == "Budget inicial"
+
+
+# --- decisão dos pedidos -----------------------------------------------------
+
+
+def test_aprovar_altera_o_budget_e_regista_no_historico(ligacao, natal, pedido):
+    aprovado = servico.aprovar(ligacao, pedido.id)
+
+    assert aprovado.estado == modelos.APROVADO
+    assert aprovado.decidido_em == datetime(2026, 11, 18, 10, 0)
+    assert campanhas.obter(ligacao, natal.id).budget_centimos == 200000
+    (alteracao,) = campanhas.historico_budget(ligacao, natal)
+    assert alteracao.budget_anterior_centimos == 150000
+    assert alteracao.budget_novo_centimos == 200000
+    assert alteracao.motivo == f"Pedido de budget n.º {pedido.id}: Mais anúncios em vídeo"
+    assert alteracao.pedido_budget_id == pedido.id
+
+
+def test_aprovar_usa_o_budget_atual_da_campanha_como_valor_anterior(ligacao, natal, pedido):
+    campanhas.definir_budget(ligacao, natal.id, "1600", "Correção")
+
+    servico.aprovar(ligacao, pedido.id)
+
+    anterior, ultima = campanhas.historico_budget(ligacao, natal)
+    assert anterior.budget_novo_centimos == 160000
+    assert ultima.budget_anterior_centimos == 160000
+    assert ultima.budget_novo_centimos == 200000
+
+
+def test_aprovar_mesmo_com_parecer_desfavoravel(ligacao, natal, pedido):
+    pedidos_bd.definir_parecer(ligacao, pedido.id, False, "Não há criativos", modelos.EM_ANALISE)
+
+    assert servico.aprovar(ligacao, pedido.id).estado == modelos.APROVADO
+    assert campanhas.obter(ligacao, natal.id).budget_centimos == 200000
+
+
+def test_rejeitar_guarda_o_motivo_e_nao_muda_o_budget(ligacao, natal, pedido):
+    rejeitado = servico.rejeitar(ligacao, pedido.id, "  Sem margem este ano ")
+
+    assert rejeitado.estado == modelos.REJEITADO
+    assert rejeitado.motivo_rejeicao == "Sem margem este ano"
+    assert rejeitado.decidido_em == datetime(2026, 11, 18, 10, 0)
+    assert campanhas.obter(ligacao, natal.id).budget_centimos == 150000
+    assert campanhas.historico_budget(ligacao, natal) == []
+
+
+def test_rejeitar_sem_motivo_nao_decide(ligacao, pedido):
+    with pytest.raises(ErroValidacao, match="O motivo da rejeição não pode ficar vazio"):
+        servico.rejeitar(ligacao, pedido.id, "  ")
+
+    assert pedidos_bd.obter_por_id(ligacao, pedido.id).estado == modelos.EM_ANALISE
+
+
+@pytest.mark.parametrize("decidir", [servico.aprovar, lambda ligacao, numero: servico.rejeitar(ligacao, numero, "Não")])
+def test_pedido_sem_parecer_nao_pode_ser_decidido(ligacao, natal, decidir):
+    sem_parecer = pedidos_bd.criar(ligacao, natal.id, 150000, 200000, "Mais anúncios")
+
+    with pytest.raises(ErroValidacao, match="Este pedido ainda não tem o parecer do marketeer"):
+        decidir(ligacao, sem_parecer.id)
+
+    assert pedidos_bd.obter_por_id(ligacao, sem_parecer.id).estado == modelos.PENDENTE
+    assert campanhas.obter(ligacao, natal.id).budget_centimos == 150000
+
+
+@pytest.mark.parametrize("estado", [modelos.APROVADO, modelos.REJEITADO, modelos.CANCELADO])
+def test_pedido_decidido_ou_cancelado_nao_pode_ser_decidido_outra_vez(ligacao, natal, pedido, estado):
+    pedidos_bd.definir_estado(ligacao, pedido.id, estado)
+
+    with pytest.raises(ErroValidacao, match="Este pedido já não pode ser decidido"):
+        servico.aprovar(ligacao, pedido.id)
+
+    assert campanhas.obter(ligacao, natal.id).budget_centimos == 150000
+
+
+def test_aprovar_nao_faz_nada_se_o_budget_ja_for_o_pedido(ligacao, natal, pedido):
+    campanhas.definir_budget(ligacao, natal.id, "2000", "Já acordado por telefone")
+
+    with pytest.raises(ErroValidacao, match="O budget da campanha já é 2 000,00 €"):
+        servico.aprovar(ligacao, pedido.id)
+
+    assert pedidos_bd.obter_por_id(ligacao, pedido.id).estado == modelos.EM_ANALISE
+    assert len(campanhas.historico_budget(ligacao, natal)) == 1
+
+
+def test_pedido_que_nao_existe_da_erro(ligacao):
+    with pytest.raises(ErroValidacao, match="Não existe nenhum pedido de budget com o número 999"):
+        servico.obter(ligacao, 999)
+
+
+def test_lista_do_administrador_mostra_primeiro_os_por_decidir(ligacao, contas, natal, pedido):
+    outra = campanhas_bd.criar(ligacao, "Outra", "", contas[modelos.CLIENTE].id, contas[modelos.MARKETEER].id)
+    servico.rejeitar(ligacao, pedido.id, "Não")
+    novo = pedidos_bd.criar(ligacao, outra.id, None, 50000, "Começar")
+
+    assert [p.id for p in servico.listar_todos(ligacao)] == [novo.id, pedido.id]
