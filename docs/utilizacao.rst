@@ -43,9 +43,11 @@ São também criadas três campanhas: ``Natal 2026`` e ``Regresso às aulas``, d
 marketeer ``marketeer@agencia.pt``, e ``Bicicletas de primavera``, da
 marketeer ``marta@agencia.pt``. Ficam também dois pedidos de campanha
 pendentes, um do cliente ``jose@padaria.pt`` e outro da cliente
-``beatriz@bicicletas.pt``, e quatro criativos: dois na campanha
+``beatriz@bicicletas.pt``, quatro criativos (dois na campanha
 ``Natal 2026``, um em ``Regresso às aulas`` e um em ``Bicicletas de
-primavera``. O comando pode ser repetido: só acrescenta o que faltar.
+primavera``) e um pedido de alteração de budget pendente, da cliente
+``cliente@empresa.pt``, para passar o budget da campanha ``Natal 2026`` de
+1500 € para 2000 €. O comando pode ser repetido: só acrescenta o que faltar.
 
 Entrar e sair
 -------------
@@ -617,11 +619,14 @@ Cliente
 Pedidos de campanha
 ~~~~~~~~~~~~~~~~~~~
 
-Mostra os pedidos de nova campanha feitos pelo cliente, do mais recente para
-o mais antigo, e por baixo as opções para os gerir. Um cliente só vê os seus
-pedidos.
+Mostra os pedidos feitos pelo cliente, em duas listas: primeiro os pedidos
+de nova campanha, depois os pedidos de alteração de budget. Cada lista vai do
+pedido mais recente para o mais antigo. Por baixo aparecem as opções para os
+gerir. Um cliente só vê os seus pedidos.
 
 .. code-block:: text
+
+   Pedidos de nova campanha
 
    N.º  Feito em    Objetivo                      Orçamento  Prazo       Estado
    ---  ----------  ----------------------------  ---------  ----------  --------
@@ -629,8 +634,16 @@ pedidos.
 
    1 pedido.
 
+   Pedidos de alteração de budget
+
+   Nenhum.
+
+Os dois tipos de pedido têm numerações próprias: o pedido de campanha n.º 1 e
+o pedido de budget n.º 1 são pedidos diferentes. Por isso, cada tipo tem as
+suas opções de ver e de cancelar.
+
 Um objetivo com mais de 40 caracteres aparece cortado na lista; a opção
-**Ver pedido** mostra-o completo.
+**Ver pedido de campanha** mostra-o completo.
 
 .. list-table::
    :header-rows: 1
@@ -646,12 +659,12 @@ Um objetivo com mais de 40 caracteres aparece cortado na lista; a opção
    * - ``Aprovado``
      - O pedido foi aceite e deu origem a uma campanha.
    * - ``Rejeitado``
-     - O pedido foi recusado. O motivo aparece em **Ver pedido**.
+     - O pedido foi recusado. O motivo aparece em **Ver pedido de campanha**.
    * - ``Cancelado``
      - O cliente desistiu do pedido.
 
-Novo pedido
-^^^^^^^^^^^
+Novo pedido de campanha
+^^^^^^^^^^^^^^^^^^^^^^^
 
 .. list-table::
    :header-rows: 1
@@ -675,18 +688,73 @@ Novo pedido
 O pedido fica no estado ``Pendente``. Se algum valor não respeitar as regras,
 o pedido não é registado.
 
-Ver pedido
-^^^^^^^^^^
+Ver pedido de campanha
+^^^^^^^^^^^^^^^^^^^^^^
 
 Pede o número do pedido e mostra todos os dados dele. Num pedido rejeitado
 aparece o motivo; num pedido aprovado aparece o número da campanha criada.
 
-Cancelar pedido
-^^^^^^^^^^^^^^^
+Cancelar pedido de campanha
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Pede o número do pedido, mostra os dados dele e pede confirmação. Só um
 pedido ``Pendente`` pode ser cancelado. O pedido cancelado não é apagado:
 continua na lista, com o estado ``Cancelado``.
+
+Pedir alteração de budget
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Serve para pedir que o budget de uma campanha passe a ser outro valor, maior
+ou menor. A aplicação mostra as campanhas do cliente que ainda não
+terminaram, com o budget de cada uma, e pede:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Dado
+     - Regras
+   * - Campanha
+     - Escolhe-se pelo número. Não pode ter terminado, nem ter já um pedido
+       de alteração de budget ``Pendente`` ou ``Em análise``.
+   * - Budget pretendido
+     - Obrigatório, em euros e maior do que zero. Tem de ser diferente do
+       budget atual.
+   * - Motivo do pedido
+     - Obrigatório.
+
+Uma campanha que ainda não tem budget também aceita pedidos: nesse caso o
+budget atual aparece como ``Por definir``.
+
+O pedido fica ``Pendente`` até o marketeer responsável dar o parecer e o
+Administrador o decidir. Se algum valor não respeitar as regras, o pedido não
+é registado.
+
+Na lista, as colunas ``De`` e ``Para`` mostram o budget que a campanha tinha
+quando o pedido foi feito e o budget pedido:
+
+.. code-block:: text
+
+   Pedidos de alteração de budget
+
+   N.º  Feito em    Campanha    De          Para        Estado
+   ---  ----------  ----------  ----------  ----------  --------
+   1    2026-11-18  Natal 2026  1 500,00 €  2 000,00 €  Pendente
+
+   1 pedido de alteração de budget.
+
+Ver pedido de budget
+^^^^^^^^^^^^^^^^^^^^
+
+Pede o número do pedido de budget e mostra todos os dados dele, incluindo o
+motivo. Num pedido rejeitado aparece também o motivo da rejeição.
+
+Cancelar pedido de budget
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Funciona como **Cancelar pedido de campanha**: só um pedido ``Pendente`` pode
+ser cancelado, depois de confirmação, e continua na lista com o estado
+``Cancelado``.
 
 Campanhas
 ~~~~~~~~~
@@ -702,10 +770,13 @@ marketeer responsável. Um cliente só vê as suas campanhas.
 
    1 campanha.
    O budget de cada campanha é definido pelo administrador.
+   Para pedir outro valor, use a opção "Pedidos de campanha".
    A despesa é a soma do custo estimado dos criativos de cada campanha.
 
 Uma campanha que ainda não tem budget atribuído aparece na lista com
-``Por definir`` na coluna do budget. O cliente não altera o budget.
+``Por definir`` na coluna do budget. O cliente não altera o budget
+diretamente: pede a alteração na opção **Pedidos de campanha** (ver
+`Pedir alteração de budget`_).
 
 A despesa e o restante são calculados como no menu do Marketeer: a despesa
 é a soma do custo dos criativos da campanha, e o restante é o budget menos a
