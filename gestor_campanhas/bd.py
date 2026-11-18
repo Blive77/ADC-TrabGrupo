@@ -97,6 +97,21 @@ CREATE TABLE IF NOT EXISTS criativos (
     ficheiro TEXT NOT NULL DEFAULT '',
     criado_em TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS pedidos_budget (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campanha_id INTEGER NOT NULL REFERENCES campanhas (id) ON DELETE CASCADE,
+    budget_atual_centimos INTEGER,
+    budget_pedido_centimos INTEGER NOT NULL,
+    motivo TEXT NOT NULL,
+    estado TEXT NOT NULL DEFAULT 'pendente'
+        CHECK (estado IN ('pendente', 'em_analise', 'aprovado', 'rejeitado', 'cancelado')),
+    parecer_viavel INTEGER CHECK (parecer_viavel IN (0, 1)),
+    parecer_justificacao TEXT NOT NULL DEFAULT '',
+    motivo_rejeicao TEXT NOT NULL DEFAULT '',
+    criado_em TEXT NOT NULL,
+    decidido_em TEXT
+);
 """
 
 
