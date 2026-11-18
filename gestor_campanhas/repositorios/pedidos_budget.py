@@ -119,6 +119,41 @@ def obter_por_decidir(ligacao: sqlite3.Connection, campanha_id: int) -> PedidoBu
     return _de_linha(linha) if linha else None
 
 
+def listar_por_marketeer(ligacao: sqlite3.Connection, marketeer_id: int) -> list[PedidoBudget]:
+    """Devolve os pedidos feitos para as campanhas de que um marketeer é responsável.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param marketeer_id: Identificador do marketeer.
+    :return: Pedidos dessas campanhas, do mais antigo para o mais recente.
+    """
+    linhas = ligacao.execute(
+        f"{_SELECIONAR} WHERE campanhas.marketeer_id = ? ORDER BY pedidos_budget.id", (marketeer_id,)
+    ).fetchall()
+    return [_de_linha(linha) for linha in linhas]
+
+
+def definir_parecer(
+    ligacao: sqlite3.Connection, identificador: int, viavel: bool, justificacao: str, estado: str
+) -> PedidoBudget:
+    """Guarda o parecer do marketeer sobre um pedido e muda-lhe o estado.
+
+    Se o pedido já tinha parecer, o anterior é substituído.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param identificador: Identificador do pedido.
+    :param viavel: ``True`` se o marketeer acha o pedido viável.
+    :param justificacao: Porque é que o marketeer acha que é, ou não é, viável.
+    :param estado: Estado em que o pedido fica.
+    :return: O pedido, já com o parecer.
+    """
+    ligacao.execute(
+        "UPDATE pedidos_budget SET parecer_viavel = ?, parecer_justificacao = ?, estado = ? WHERE id = ?",
+        (int(viavel), justificacao, estado, identificador),
+    )
+    ligacao.commit()
+    return obter_por_id(ligacao, identificador)
+
+
 def definir_estado(ligacao: sqlite3.Connection, identificador: int, estado: str) -> PedidoBudget:
     """Altera o estado de um pedido.
 

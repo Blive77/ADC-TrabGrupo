@@ -119,6 +119,35 @@ def test_repositorio_altera_o_estado(ligacao, natal):
     assert cancelado.nome_estado == "Cancelado"
 
 
+def test_repositorio_guarda_o_parecer_e_muda_o_estado(ligacao, natal):
+    pedido = repositorio.criar(ligacao, natal.id, 150000, 200000, "Mais anúncios")
+
+    com_parecer = repositorio.definir_parecer(ligacao, pedido.id, False, "Não há criativos para isso", modelos.EM_ANALISE)
+
+    assert com_parecer.parecer_viavel is False
+    assert com_parecer.nome_parecer == "Não viável"
+    assert com_parecer.parecer_justificacao == "Não há criativos para isso"
+    assert com_parecer.estado == modelos.EM_ANALISE
+
+    outro = repositorio.definir_parecer(ligacao, pedido.id, True, "Afinal há", modelos.EM_ANALISE)
+
+    assert outro.parecer_viavel is True
+    assert outro.parecer_justificacao == "Afinal há"
+
+
+def test_repositorio_lista_os_pedidos_das_campanhas_do_marketeer(ligacao, contas, natal):
+    marta = utilizadores.criar(
+        ligacao, "Marta Marques", "marta@agencia.pt", seguranca.gerar_hash(PASSWORD_TESTE), modelos.MARKETEER
+    )
+    da_marta = campanhas_bd.criar(ligacao, "Primavera", "", contas[modelos.CLIENTE].id, marta.id)
+    primeiro = repositorio.criar(ligacao, natal.id, 150000, 200000, "Primeiro")
+    outro = repositorio.criar(ligacao, da_marta.id, None, 50000, "Da Marta")
+    segundo = repositorio.criar(ligacao, natal.id, 150000, 100000, "Segundo")
+
+    assert repositorio.listar_por_marketeer(ligacao, contas[modelos.MARKETEER].id) == [primeiro, segundo]
+    assert repositorio.listar_por_marketeer(ligacao, marta.id) == [outro]
+
+
 @pytest.mark.parametrize(("viavel", "nome"), [(True, "Viável"), (False, "Não viável"), (None, "Por dar")])
 def test_nome_do_parecer(viavel, nome):
     pedido = modelos.PedidoBudget(1, 1, 100, 200, "Motivo", parecer_viavel=viavel)
