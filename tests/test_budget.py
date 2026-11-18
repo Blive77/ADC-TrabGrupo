@@ -5,11 +5,15 @@ from datetime import date, datetime
 import pytest
 
 from gestor_campanhas import modelos, relogio, seguranca
+from gestor_campanhas.cli import budget as menu
+from gestor_campanhas.cli import campanhas as menu_campanhas
+from gestor_campanhas.cli import pedidos as menu_pedidos
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
 from gestor_campanhas.repositorios import pedidos_budget as repositorio
 from gestor_campanhas.repositorios import utilizadores
 from gestor_campanhas.servicos import budget as servico
+from gestor_campanhas.servicos import pedidos as servico_pedidos
 from tests.conftest import PASSWORD_TESTE
 
 
@@ -260,3 +264,170 @@ def test_cliente_nao_cancela_pedidos_de_outro(ligacao, pedido, jose):
         servico.cancelar(ligacao, jose, pedido.id)
 
     assert repositorio.obter_por_id(ligacao, pedido.id).estado == modelos.PENDENTE
+
+
+# --- menu do cliente ---------------------------------------------------------
+
+
+def test_menu_mostra_os_dois_tipos_de_pedido(teclado, ligacao, contas, pedido, capsys):
+    teclado("0")
+
+    menu_pedidos.do_cliente(ligacao, contas[modelos.CLIENTE])
+
+    saida = capsys.readouterr().out
+    assert "Pedidos de nova campanha\n\nNenhum." in saida
+    assert "Pedidos de alteração de budget" in saida
+    assert "N.º  Feito em    Campanha    De          Para        Estado" in saida
+    assert f"{pedido.id}    2026-11-18  Natal 2026  1 500,00 €  2 000,00 €  Pendente" in saida
+    assert "1 pedido de alteração de budget." in saida
+    assert "4. Pedir alteração de budget" in saida
+    assert "5. Ver pedido de budget" in saida
+    assert "6. Cancelar pedido de budget" in saida
+
+
+def test_menu_sem_pedidos_de_budget_diz_nenhum(teclado, ligacao, contas, capsys):
+    servico_pedidos.criar(ligacao, contas[modelos.CLIENTE], "Vender", "100", "2026-12-01", ["Facebook"])
+    teclado("0")
+
+    menu_pedidos.do_cliente(ligacao, contas[modelos.CLIENTE])
+
+    saida = capsys.readouterr().out
+    assert "1 pedido." in saida
+    assert "Pedidos de alteração de budget\n\nNenhum." in saida
+
+
+def test_menu_regista_um_pedido_de_budget(teclado, ligacao, contas, natal, capsys):
+    carla = contas[modelos.CLIENTE]
+    teclado("4", str(natal.id), "2000", "Mais anúncios em vídeo", "", "0")
+
+    menu_pedidos.do_cliente(ligacao, carla)
+
+    saida = capsys.readouterr().out
+    (registado,) = servico.listar_do_cliente(ligacao, carla)
+    assert "N.º  Campanha    Budget      Estado" in saida
+    assert f"{natal.id}    Natal 2026  1 500,00 €  Por começar" in saida
+    assert "Budget atual da campanha Natal 2026: 1 500,00 €." in saida
+    assert f"Pedido registado com o número {registado.id}." in saida
+    assert "Fica pendente até o marketeer dar o parecer e o administrador o decidir." in saida
+    assert registado.budget_pedido_centimos == 200000
+    assert registado.motivo == "Mais anúncios em vídeo"
+
+
+def test_menu_so_mostra_as_campanhas_que_nao_terminaram(teclado, ligacao, contas, natal, capsys):
+    carla = contas[modelos.CLIENTE]
+    campanhas_bd.criar(
+        ligacao, "Verão", "", carla.id, contas[modelos.MARKETEER].id, date(2026, 7, 1), date(2026, 8, 31), 50000
+    )
+    teclado("")
+
+    menu.pedir_alteracao(ligacao, carla)
+
+    saida = capsys.readouterr().out
+    assert "Natal 2026" in saida
+    assert "Verão" not in saida
+
+
+def test_menu_sem_campanhas_por_terminar_avisa(teclado, ligacao, jose, capsys):
+    teclado("")
+
+    menu.pedir_alteracao(ligacao, jose)
+
+    assert "Não tem campanhas a decorrer ou por começar." in capsys.readouterr().out
+
+
+def test_menu_avisa_logo_quando_a_campanha_ja_tem_um_pedido(teclado, ligacao, contas, pedido, natal, capsys):
+    teclado(str(natal.id), "")
+
+    menu.pedir_alteracao(ligacao, contas[modelos.CLIENTE])
+
+    saida = capsys.readouterr().out
+    assert f"já tem um pedido de alteração de budget por decidir (n.º {pedido.id})" in saida
+    assert "Budget pretendido" not in saida
+
+
+def test_menu_mostra_o_erro_e_nao_regista_o_pedido(teclado, ligacao, contas, natal, capsys):
+    carla = contas[modelos.CLIENTE]
+    teclado(str(natal.id), "1500", "Igual", "")
+
+    menu.pedir_alteracao(ligacao, carla)
+
+    assert "O valor pedido é igual ao budget atual da campanha. O pedido não foi registado." in capsys.readouterr().out
+    assert servico.listar_do_cliente(ligacao, carla) == []
+
+
+def test_menu_nao_aceita_campanhas_de_outro_cliente(teclado, ligacao, jose, padaria, natal, capsys):
+    teclado(str(natal.id), "")
+
+    menu.pedir_alteracao(ligacao, jose)
+
+    assert f"Não tem nenhuma campanha com o número {natal.id}." in capsys.readouterr().out
+
+
+def test_menu_mostra_os_detalhes_de_um_pedido_de_budget(teclado, ligacao, contas, pedido, capsys):
+    teclado("5", str(pedido.id), "", "0")
+
+    menu_pedidos.do_cliente(ligacao, contas[modelos.CLIENTE])
+
+    saida = capsys.readouterr().out
+    assert f"Pedido de budget n.º {pedido.id}" in saida
+    assert "  Campanha:     Natal 2026" in saida
+    assert "  Feito em:     2026-11-18 10:00" in saida
+    assert "  Budget de:    1 500,00 €" in saida
+    assert "  Budget para:  2 000,00 €" in saida
+    assert "  Motivo:       Mais anúncios em vídeo" in saida
+    assert "  Estado:       Pendente" in saida
+    assert "Rejeição:" not in saida
+
+
+def test_detalhes_de_um_pedido_rejeitado_mostram_o_motivo(ligacao, natal, capsys):
+    pedido = repositorio.criar(ligacao, natal.id, 150000, 200000, "Mais anúncios")
+    ligacao.execute(
+        "UPDATE pedidos_budget SET estado = 'rejeitado', motivo_rejeicao = 'Sem margem' WHERE id = ?", (pedido.id,)
+    )
+
+    menu.mostrar_detalhes(repositorio.obter_por_id(ligacao, pedido.id))
+
+    assert "  Rejeição:     Sem margem" in capsys.readouterr().out
+
+
+def test_menu_nao_mostra_pedidos_de_budget_de_outro(teclado, ligacao, pedido, jose, capsys):
+    teclado(str(pedido.id), "")
+
+    menu.ver_pedido(ligacao, jose)
+
+    assert f"Não tem nenhum pedido de budget com o número {pedido.id}." in capsys.readouterr().out
+
+
+def test_menu_cancela_um_pedido_de_budget(teclado, ligacao, contas, pedido, capsys):
+    teclado("6", str(pedido.id), "s", "", "0")
+
+    menu_pedidos.do_cliente(ligacao, contas[modelos.CLIENTE])
+
+    assert "Pedido cancelado." in capsys.readouterr().out
+    assert repositorio.obter_por_id(ligacao, pedido.id).estado == modelos.CANCELADO
+
+
+def test_menu_nao_cancela_sem_confirmacao(teclado, ligacao, contas, pedido, capsys):
+    teclado(str(pedido.id), "n", "")
+
+    menu.cancelar_pedido(ligacao, contas[modelos.CLIENTE])
+
+    assert "Nada foi alterado." in capsys.readouterr().out
+    assert repositorio.obter_por_id(ligacao, pedido.id).estado == modelos.PENDENTE
+
+
+def test_menu_nao_cancela_um_pedido_em_analise(teclado, ligacao, contas, pedido, capsys):
+    repositorio.definir_estado(ligacao, pedido.id, modelos.EM_ANALISE)
+    teclado(str(pedido.id), "")
+
+    menu.cancelar_pedido(ligacao, contas[modelos.CLIENTE])
+
+    assert "Só é possível cancelar um pedido pendente. Este pedido está no estado Em análise." in capsys.readouterr().out
+
+
+def test_campanhas_do_cliente_explicam_como_pedir_outro_budget(teclado, ligacao, contas, natal, capsys):
+    teclado("0")
+
+    menu_campanhas.do_cliente(ligacao, contas[modelos.CLIENTE])
+
+    assert 'Para pedir outro valor, use a opção "Pedidos de campanha".' in capsys.readouterr().out

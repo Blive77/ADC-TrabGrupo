@@ -513,6 +513,7 @@ def do_cliente(ligacao: sqlite3.Connection, utilizador: Utilizador) -> None:
         if lista:
             mostrar_do_cliente(lista, criativos.despesas(ligacao))
             print("O budget de cada campanha é definido pelo administrador.")
+            print('Para pedir outro valor, use a opção "Pedidos de campanha".')
             print("A despesa é a soma do custo estimado dos criativos de cada campanha.")
         else:
             print('Ainda não tem campanhas. Pode pedir uma na opção "Pedidos de campanha".')

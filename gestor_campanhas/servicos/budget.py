@@ -14,12 +14,36 @@ import sqlite3
 
 from gestor_campanhas import modelos, relogio
 from gestor_campanhas.erros import ErroValidacao
-from gestor_campanhas.modelos import PedidoBudget, Utilizador
+from gestor_campanhas.modelos import Campanha, PedidoBudget, Utilizador
 from gestor_campanhas.repositorios import pedidos_budget
 from gestor_campanhas.servicos import campanhas
 
 #: Estados em que um pedido ainda espera pela decisão do Administrador.
 POR_DECIDIR = (modelos.PENDENTE, modelos.EM_ANALISE)
+
+
+def campanha_para_pedido(ligacao: sqlite3.Connection, cliente: Utilizador, campanha_id: int) -> Campanha:
+    """Procura uma campanha do cliente e confirma que aceita um pedido de alteração de budget.
+
+    O menu usa esta função logo depois de o cliente escolher a campanha, para
+    o avisar antes de lhe pedir o valor e o motivo.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param cliente: Cliente que está a fazer o pedido.
+    :param campanha_id: Número da campanha.
+    :return: A campanha.
+    :raises ErroValidacao: Se a campanha não for do cliente, se já tiver
+        terminado ou se já tiver um pedido por decidir.
+    """
+    campanha = campanhas.obter_do_cliente(ligacao, cliente, campanha_id)
+    if campanha.terminada(relogio.hoje()):
+        raise ErroValidacao(f"A campanha {campanha.nome} já terminou. O budget já não pode ser alterado.")
+    anterior = pedidos_budget.obter_por_decidir(ligacao, campanha.id)
+    if anterior is not None:
+        raise ErroValidacao(
+            f"A campanha {campanha.nome} já tem um pedido de alteração de budget por decidir (n.º {anterior.id})."
+        )
+    return campanha
 
 
 def pedir(
@@ -43,14 +67,7 @@ def pedir(
         terminado, se já tiver um pedido por decidir, ou se algum dos valores
         não respeitar as regras.
     """
-    campanha = campanhas.obter_do_cliente(ligacao, cliente, campanha_id)
-    if campanha.terminada(relogio.hoje()):
-        raise ErroValidacao(f"A campanha {campanha.nome} já terminou. O budget já não pode ser alterado.")
-    anterior = pedidos_budget.obter_por_decidir(ligacao, campanha.id)
-    if anterior is not None:
-        raise ErroValidacao(
-            f"A campanha {campanha.nome} já tem um pedido de alteração de budget por decidir (n.º {anterior.id})."
-        )
+    campanha = campanha_para_pedido(ligacao, cliente, campanha_id)
     centimos = campanhas.budget_validado(budget)
     if centimos == campanha.budget_centimos:
         raise ErroValidacao("O valor pedido é igual ao budget atual da campanha.")
