@@ -15,7 +15,7 @@ Estrutura de pastas
      __main__.py          ponto de entrada (python -m gestor_campanhas)
      config.py            caminhos da pasta de dados e da base de dados
      bd.py                ligação SQLite e criação das tabelas
-     modelos.py           classes de dados (Utilizador, Campanha, PedidoCampanha, Criativo), perfis e estados
+     modelos.py           classes de dados (Utilizador, Campanha, PedidoCampanha, Criativo, PedidoBudget), perfis e estados
      erros.py             erros que os menus mostram ao utilizador
      relogio.py           data e hora atuais
      seguranca.py         hash das passwords
@@ -32,6 +32,7 @@ Estrutura de pastas
        campanhas.py       campanhas, nos menus dos três perfis
        criativos.py       criativos, nos menus do Marketeer e do Cliente
        pedidos.py         pedidos de campanha, nos menus do Cliente e do Administrador
+       budget.py          pedidos de alteração de budget
        conta.py           opções da conta, comuns a todos os perfis
        recuperacao.py     recuperação da password
    exemplos/              ficheiros para experimentar a aplicação
@@ -240,12 +241,24 @@ executadas em todos os arranques sem apagar dados.
        ``publicado``), motivo da rejeição e nome do ficheiro anexado. A
        tabela é criada logo com todas as colunas; as que ainda não estão em
        uso ficam vazias.
+   * - ``pedidos_budget``
+     - Uma linha por pedido de alteração de budget: campanha, budget da
+       campanha quando o pedido foi feito, budget pedido (ambos em
+       cêntimos), motivo, estado (os mesmos de ``pedidos_campanha``), parecer
+       do marketeer (``1`` viável, ``0`` não viável, vazio enquanto não for
+       dado) e a justificação, motivo da rejeição e data da decisão. O
+       cliente é o da campanha, por isso não tem coluna própria.
 
 Uma campanha com criativos não pode ser apagada: a coluna ``campanha_id`` da
 tabela ``criativos`` aponta para ela, e o SQLite recusa apagar uma linha a
 que outra tabela ainda faz referência. A regra está também em
 :func:`gestor_campanhas.servicos.campanhas.eliminar`, que mostra uma
 mensagem a explicar o que fazer.
+
+Os pedidos de alteração de budget, pelo contrário, não impedem que a
+campanha seja apagada. A coluna ``campanha_id`` da tabela ``pedidos_budget``
+tem ``ON DELETE CASCADE``: quando a campanha é apagada, os pedidos dela são
+apagados com ela, porque não fazem sentido sem a campanha.
 
 Estados de um criativo
 ----------------------
