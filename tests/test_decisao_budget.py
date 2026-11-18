@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 import pytest
 
-from gestor_campanhas import modelos, relogio, seguranca
+from gestor_campanhas import dados_demo, modelos, relogio, seguranca
 from gestor_campanhas.cli import budget as menu
 from gestor_campanhas.cli import campanhas as menu_campanhas
 from gestor_campanhas.cli import perfis
@@ -433,3 +433,38 @@ def test_administrador_ve_o_historico_de_qualquer_campanha(teclado, ligacao, con
     assert "3. Histórico do budget" in saida
     assert "2026-11-18 10:00  1 500,00 €  1 800,00 €  Desconto do fornecedor" in saida
     assert "1 alteração." in saida
+
+
+# --- dados de demonstração ---------------------------------------------------
+
+
+def test_dados_demo_registam_o_budget_inicial_das_campanhas_com_budget(ligacao):
+    dados_demo.criar_contas(ligacao)
+    dados_demo.criar_campanhas(ligacao)
+
+    registadas = dados_demo.registar_budgets_iniciais(ligacao)
+
+    assert registadas == ["Natal 2026", "Regresso às aulas"]
+    natal = next(c for c in campanhas.listar_todas(ligacao) if c.nome == "Natal 2026")
+    (alteracao,) = campanhas.historico_budget(ligacao, natal)
+    assert alteracao.budget_anterior_centimos is None
+    assert alteracao.budget_novo_centimos == 150000
+    assert alteracao.motivo == "Budget inicial"
+
+
+def test_dados_demo_nao_repetem_o_budget_inicial(ligacao):
+    dados_demo.criar_contas(ligacao)
+    dados_demo.criar_campanhas(ligacao)
+    dados_demo.registar_budgets_iniciais(ligacao)
+
+    assert dados_demo.registar_budgets_iniciais(ligacao) == []
+
+
+def test_dados_demo_nao_mexem_em_campanhas_que_ja_tem_historico(ligacao):
+    dados_demo.criar_contas(ligacao)
+    dados_demo.criar_campanhas(ligacao)
+    natal = next(c for c in campanhas.listar_todas(ligacao) if c.nome == "Natal 2026")
+    campanhas.definir_budget(ligacao, natal.id, "2000", "Mais anúncios")
+
+    assert dados_demo.registar_budgets_iniciais(ligacao) == ["Regresso às aulas"]
+    assert len(campanhas.historico_budget(ligacao, natal)) == 1
