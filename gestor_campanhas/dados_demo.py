@@ -20,7 +20,15 @@ from datetime import date
 
 from gestor_campanhas import bd, modelos, seguranca
 from gestor_campanhas.cli import comum
-from gestor_campanhas.repositorios import campanhas, criativos, pedidos, pedidos_budget, utilizadores
+from gestor_campanhas.repositorios import (
+    alteracoes_budget,
+    campanhas,
+    criativos,
+    pedidos,
+    pedidos_budget,
+    utilizadores,
+)
+from gestor_campanhas.servicos.campanhas import MOTIVO_BUDGET_INICIAL
 
 #: Contas de demonstração: pelo menos uma de cada perfil.
 CONTAS = [
@@ -233,6 +241,29 @@ def criar_campanhas(ligacao: sqlite3.Connection) -> list[str]:
     return criadas
 
 
+def registar_budgets_iniciais(ligacao: sqlite3.Connection) -> list[str]:
+    """Regista no histórico o budget inicial das campanhas de demonstração.
+
+    As campanhas de demonstração são criadas já com budget, sem passar pelas
+    regras que registam o histórico. Esta função acrescenta a linha
+    "Budget inicial" às que têm budget e ainda não têm nenhuma alteração
+    registada.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :return: Nomes das campanhas a que foi acrescentado o budget inicial.
+    """
+    registadas = []
+    nomes = {campanha["nome"] for campanha in CAMPANHAS}
+    for campanha in campanhas.listar_todas(ligacao):
+        if campanha.nome not in nomes or campanha.budget_centimos is None:
+            continue
+        if alteracoes_budget.listar_por_campanha(ligacao, campanha.id):
+            continue
+        alteracoes_budget.registar(ligacao, campanha.id, None, campanha.budget_centimos, MOTIVO_BUDGET_INICIAL)
+        registadas.append(campanha.nome)
+    return registadas
+
+
 def criar_pedidos(ligacao: sqlite3.Connection) -> list[str]:
     """Cria os pedidos de campanha de demonstração que ainda não existem.
 
@@ -317,6 +348,7 @@ def main() -> int:
     try:
         criadas = criar_contas(ligacao)
         campanhas_criadas = criar_campanhas(ligacao)
+        budgets_registados = registar_budgets_iniciais(ligacao)
         pedidos_criados = criar_pedidos(ligacao)
         criativos_criados = criar_criativos(ligacao)
         pedidos_budget_criados = criar_pedidos_budget(ligacao)
@@ -324,6 +356,7 @@ def main() -> int:
         ligacao.close()
     print(f"Contas criadas: {len(criadas)} (as restantes já existiam).")
     print(f"Campanhas criadas: {len(campanhas_criadas)} (as restantes já existiam).")
+    print(f"Budgets iniciais registados no histórico: {len(budgets_registados)} (os restantes já estavam).")
     print(f"Pedidos de campanha criados: {len(pedidos_criados)} (os restantes já existiam).")
     print(f"Criativos criados: {len(criativos_criados)} (os restantes já existiam).")
     print(f"Pedidos de alteração de budget criados: {len(pedidos_budget_criados)} (os restantes já existiam).")

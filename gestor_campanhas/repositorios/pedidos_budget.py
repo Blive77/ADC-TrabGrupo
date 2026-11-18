@@ -154,6 +154,34 @@ def definir_parecer(
     return obter_por_id(ligacao, identificador)
 
 
+def listar_todos(ligacao: sqlite3.Connection) -> list[PedidoBudget]:
+    """Devolve os pedidos de alteração de budget de todas as campanhas.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :return: Pedidos, do mais antigo para o mais recente.
+    """
+    linhas = ligacao.execute(f"{_SELECIONAR} ORDER BY pedidos_budget.id").fetchall()
+    return [_de_linha(linha) for linha in linhas]
+
+
+def decidir(ligacao: sqlite3.Connection, identificador: int, estado: str, motivo_rejeicao: str = "") -> PedidoBudget:
+    """Regista a decisão do Administrador sobre um pedido, com a data e hora atuais.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param identificador: Identificador do pedido.
+    :param estado: :data:`~gestor_campanhas.modelos.APROVADO` ou
+        :data:`~gestor_campanhas.modelos.REJEITADO`.
+    :param motivo_rejeicao: Motivo indicado pelo Administrador, quando o pedido é rejeitado.
+    :return: O pedido, já decidido.
+    """
+    ligacao.execute(
+        "UPDATE pedidos_budget SET estado = ?, motivo_rejeicao = ?, decidido_em = ? WHERE id = ?",
+        (estado, motivo_rejeicao, relogio.para_texto(relogio.agora()), identificador),
+    )
+    ligacao.commit()
+    return obter_por_id(ligacao, identificador)
+
+
 def definir_estado(ligacao: sqlite3.Connection, identificador: int, estado: str) -> PedidoBudget:
     """Altera o estado de um pedido.
 

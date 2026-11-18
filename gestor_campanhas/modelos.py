@@ -302,3 +302,28 @@ class PedidoBudget:
         if self.parecer_viavel is None:
             return "Por dar"
         return "Viável" if self.parecer_viavel else "Não viável"
+
+
+@dataclass
+class AlteracaoBudget:
+    """Uma alteração do budget de uma campanha, registada no histórico.
+
+    :param id: Identificador na base de dados.
+    :param campanha_id: Identificador da campanha.
+    :param budget_anterior_centimos: Budget antes da alteração, em cêntimos,
+        ou ``None`` se a campanha ainda não tinha budget.
+    :param budget_novo_centimos: Budget depois da alteração, em cêntimos.
+    :param motivo: Porque é que o budget mudou.
+    :param alterado_em: Data e hora da alteração.
+    :param pedido_budget_id: Identificador do pedido de alteração de budget
+        que deu origem à alteração, ou ``None`` se o Administrador alterou o
+        budget sem pedido.
+    """
+
+    id: int
+    campanha_id: int
+    budget_anterior_centimos: int | None
+    budget_novo_centimos: int
+    motivo: str
+    alterado_em: datetime
+    pedido_budget_id: int | None = None

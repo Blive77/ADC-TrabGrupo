@@ -47,7 +47,9 @@ pendentes, um do cliente ``jose@padaria.pt`` e outro da cliente
 ``Natal 2026``, um em ``Regresso às aulas`` e um em ``Bicicletas de
 primavera``) e um pedido de alteração de budget pendente, da cliente
 ``cliente@empresa.pt``, para passar o budget da campanha ``Natal 2026`` de
-1500 € para 2000 €. O comando pode ser repetido: só acrescenta o que faltar.
+1500 € para 2000 €. O budget das campanhas ``Natal 2026`` e ``Regresso às
+aulas`` fica registado no histórico do budget como ``Budget inicial``. O
+comando pode ser repetido: só acrescenta o que faltar.
 
 Entrar e sair
 -------------
@@ -295,6 +297,44 @@ avisado por email, com o motivo, e passa a vê-lo na opção **Ver pedido**.
 
 Um pedido aprovado, rejeitado ou cancelado já não pode ser decidido.
 
+Pedidos de budget
+~~~~~~~~~~~~~~~~~
+
+Mostra os pedidos de alteração de budget de todas as campanhas, com o
+cliente, o budget de partida (``De``), o budget pedido (``Para``), o estado e
+o parecer do marketeer. Os que estão por decidir aparecem primeiro.
+
+.. code-block:: text
+
+   N.º  Feito em    Campanha    Cliente        De          Para        Estado      Parecer
+   ---  ----------  ----------  -------------  ----------  ----------  ----------  -------
+   1    2026-11-18  Natal 2026  Carla Cliente  1 500,00 €  2 000,00 €  Em análise  Viável
+
+   1 pedido, 1 por decidir.
+
+Analisar pedido
+^^^^^^^^^^^^^^^
+
+Pede o número do pedido e mostra todos os dados dele: o motivo do cliente, o
+parecer do marketeer e a justificação, e o budget e a despesa atuais da
+campanha.
+
+Um pedido só pode ser decidido depois de o marketeer dar o parecer. Enquanto
+estiver ``Pendente``, sem parecer, a aplicação mostra os dados e avisa que
+ainda não pode ser decidido. Com o parecer, pergunta a decisão:
+
+**Aprovar e passar o budget para ...** altera logo o budget da campanha para o
+valor pedido. A alteração fica registada no histórico do budget, com o número
+e o motivo do pedido. O parecer do marketeer ajuda a decidir, mas não obriga:
+um pedido com parecer ``Não viável`` também pode ser aprovado.
+
+**Rejeitar** pede o motivo, que é obrigatório, e uma confirmação. O budget
+da campanha não muda, e o cliente vê o motivo em **Ver pedido de budget**.
+
+**Decidir mais tarde** deixa o pedido ``Em análise``.
+
+Um pedido aprovado, rejeitado ou cancelado já não pode ser decidido.
+
 Campanhas
 ~~~~~~~~~
 
@@ -312,12 +352,33 @@ responsável, as datas, o budget e o estado.
    3 campanhas.
 
 **Definir budget** pede o número da campanha e o valor em euros, que tem de
-ser maior do que zero. Serve para as campanhas criadas pelos marketeers, que
-começam sem budget, e para corrigir um budget já atribuído.
+ser maior do que zero e diferente do atual. Serve para as campanhas criadas
+pelos marketeers, que começam sem budget, e para corrigir um budget já
+atribuído. Quando a campanha já tem budget, pede também o motivo da
+alteração, que é obrigatório; no primeiro budget, o motivo fica
+``Budget inicial``.
 
 **Atribuir marketeer** pede o número da campanha e o do marketeer que passa
 a ser responsável, escolhido na lista dos marketeers com a conta ativa. O
 marketeer anterior deixa de ver a campanha e o novo é avisado por email.
+
+**Histórico do budget** pede o número da campanha e mostra todas as
+alterações do budget dela, da mais antiga para a mais recente:
+
+.. code-block:: text
+
+   Campanha Natal 2026. Budget atual: 2 000,00 €.
+
+   Data              De           Para        Motivo
+   ----------------  -----------  ----------  -------------------------------------------------------------------------------------
+   2026-11-18 10:00  Por definir  1 500,00 €  Budget inicial
+   2026-11-18 11:30  1 500,00 €   2 000,00 €  Pedido de budget n.º 1: Reforçar os anúncios em vídeo na última semana antes do Natal
+
+   2 alterações.
+
+Ficam registadas todas as alterações: o budget inicial de uma campanha criada
+a partir de um pedido de campanha, as feitas em **Definir budget** e as que
+resultam de um pedido de alteração de budget aprovado.
 
 Horários de entrada e saída dos marketeers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -784,6 +845,11 @@ quando o pedido foi feito e o budget pedido:
 
    1 pedido de alteração de budget.
 
+Quando o Administrador aprova o pedido, o budget da campanha passa logo a
+ser o valor pedido, e a alteração aparece no histórico do budget (opção
+**Campanhas**, **Histórico do budget**). Quando o rejeita, o budget fica como
+estava.
+
 Ver pedido de budget
 ^^^^^^^^^^^^^^^^^^^^
 
@@ -834,6 +900,11 @@ marketeer responsável:
      Nome:      Miguel Marketeer
      Email:     marketeer@agencia.pt
      Telefone:  910000002
+
+**Histórico do budget** pede o número da campanha e mostra as alterações do
+budget dela, com o valor anterior, o valor novo, a data e o motivo de cada
+uma, como no menu do Administrador. Um cliente só vê o histórico das suas
+campanhas.
 
 Criativos
 ~~~~~~~~~

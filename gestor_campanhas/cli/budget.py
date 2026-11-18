@@ -7,6 +7,9 @@ campanha.
 
 O Marketeer vê os pedidos das campanhas de que é responsável e dá o seu
 parecer sobre cada um, na opção "Pedidos de budget".
+
+O Administrador vê os pedidos de todas as campanhas, com o parecer do
+marketeer, e aprova-os ou rejeita-os, também na opção "Pedidos de budget".
 """
 
 from __future__ import annotations
@@ -276,3 +279,109 @@ def do_marketeer(ligacao: sqlite3.Connection, utilizador: Utilizador) -> None:
         if escolha == "0":
             return
         dar_parecer(ligacao, utilizador)
+
+
+def aprovar(ligacao: sqlite3.Connection, pedido: PedidoBudget) -> None:
+    """Aprova o pedido, o que altera o budget da campanha, e mostra o resultado.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param pedido: Pedido a aprovar.
+    """
+    try:
+        budget.aprovar(ligacao, pedido.id)
+    except ErroValidacao as erro:
+        print(f"\n{erro} O pedido não foi aprovado.")
+        return
+    campanha = campanhas.obter(ligacao, pedido.campanha_id)
+    print(f"\nPedido aprovado. O budget da campanha {campanha.nome} passou a {valor(campanha.budget_centimos)}.")
+    print("A alteração ficou registada no histórico do budget.")
+
+
+def rejeitar(ligacao: sqlite3.Connection, pedido: PedidoBudget) -> None:
+    """Pede o motivo e rejeita o pedido, depois de pedir confirmação.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param pedido: Pedido a rejeitar.
+    """
+    motivo = comum.ler_texto("Motivo da rejeição")
+    if not comum.confirmar("Rejeitar este pedido?"):
+        print("\nO pedido não foi rejeitado.")
+        return
+    try:
+        budget.rejeitar(ligacao, pedido.id, motivo)
+    except ErroValidacao as erro:
+        print(f"\n{erro} O pedido não foi rejeitado.")
+    else:
+        print("\nPedido rejeitado. O budget da campanha não mudou.")
+
+
+def decidir(ligacao: sqlite3.Connection) -> None:
+    """Pede o número de um pedido de budget, mostra-o e deixa aprová-lo ou rejeitá-lo.
+
+    Além dos dados do pedido e do parecer do marketeer, mostra o budget e a
+    despesa atuais da campanha. Um pedido só pode ser decidido depois de o
+    marketeer dar o parecer.
+
+    :param ligacao: Ligação aberta à base de dados.
+    """
+    comum.titulo("Analisar pedido de budget")
+    numero = comum.ler_numero("Número do pedido de budget (Enter para cancelar)")
+    if numero is None:
+        return
+    try:
+        pedido = budget.obter(ligacao, numero)
+    except ErroValidacao as erro:
+        print(f"\n{erro}")
+        comum.pausa()
+        return
+    campanha = campanhas.obter(ligacao, pedido.campanha_id)
+    print()
+    mostrar_detalhes(pedido, com_parecer=True)
+    gasto = criativos.despesa(ligacao, campanha)
+    print(f"\nBudget atual da campanha: {valor(campanha.budget_centimos)}. Despesa: {dinheiro.formatar(gasto)}.")
+    if pedido.estado not in budget.POR_DECIDIR:
+        print("\nEste pedido já não pode ser decidido.")
+        comum.pausa()
+        return
+    if pedido.parecer_viavel is None:
+        print("\nEste pedido ainda não tem o parecer do marketeer. Só pode ser decidido depois do parecer.")
+        comum.pausa()
+        return
+    escolha = comum.escolher_opcao(
+        "Decisão",
+        [
+            ("1", f"Aprovar e passar o budget para {valor(pedido.budget_pedido_centimos)}"),
+            ("2", "Rejeitar"),
+            ("0", "Decidir mais tarde"),
+        ],
+    )
+    if escolha == "1":
+        aprovar(ligacao, pedido)
+    elif escolha == "2":
+        rejeitar(ligacao, pedido)
+    else:
+        print("\nO pedido fica em análise.")
+    comum.pausa()
+
+
+def do_administrador(ligacao: sqlite3.Connection, utilizador: Utilizador) -> None:
+    """Opção "Pedidos de budget" do menu do Administrador.
+
+    Mostra os pedidos de alteração de budget de todas as campanhas, com os
+    que estão por decidir em primeiro lugar. A lista volta a aparecer depois
+    de cada decisão.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param utilizador: Administrador que está a usar o menu.
+    """
+    while True:
+        comum.titulo("Pedidos de alteração de budget de todos os clientes")
+        lista = budget.listar_todos(ligacao)
+        if lista:
+            mostrar_pedidos_com_parecer(lista)
+        else:
+            print("Ainda não há pedidos de alteração de budget.")
+        escolha = comum.escolher_opcao("Pedidos de budget", [("1", "Analisar pedido"), ("0", "Voltar")])
+        if escolha == "0":
+            return
+        decidir(ligacao)
