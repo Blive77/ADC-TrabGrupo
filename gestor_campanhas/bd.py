@@ -112,6 +112,16 @@ CREATE TABLE IF NOT EXISTS pedidos_budget (
     criado_em TEXT NOT NULL,
     decidido_em TEXT
 );
+
+CREATE TABLE IF NOT EXISTS alteracoes_budget (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campanha_id INTEGER NOT NULL REFERENCES campanhas (id) ON DELETE CASCADE,
+    budget_anterior_centimos INTEGER,
+    budget_novo_centimos INTEGER NOT NULL,
+    motivo TEXT NOT NULL,
+    pedido_budget_id INTEGER REFERENCES pedidos_budget (id) ON DELETE SET NULL,
+    alterado_em TEXT NOT NULL
+);
 """
 
 

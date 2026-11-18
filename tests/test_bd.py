@@ -192,3 +192,36 @@ def test_apagar_uma_campanha_apaga_os_pedidos_de_budget_dela(ligacao, contas):
     ligacao.execute("DELETE FROM campanhas WHERE id = ?", (campanha_id,))
 
     assert ligacao.execute("SELECT COUNT(*) FROM pedidos_budget").fetchone()[0] == 0
+
+
+def test_alteracao_de_budget_pode_nao_ter_valor_anterior_nem_pedido(ligacao, contas):
+    campanha_id = _campanha(ligacao, contas)
+    ligacao.execute(
+        "INSERT INTO alteracoes_budget (campanha_id, budget_novo_centimos, motivo, alterado_em) "
+        "VALUES (?, 150000, 'Budget inicial', '2026-11-18 10:00:00')",
+        (campanha_id,),
+    )
+
+    linha = ligacao.execute("SELECT budget_anterior_centimos, pedido_budget_id FROM alteracoes_budget").fetchone()
+    assert tuple(linha) == (None, None)
+
+
+def test_alteracao_de_budget_tem_de_ter_uma_campanha_que_existe(ligacao):
+    with pytest.raises(sqlite3.IntegrityError):
+        ligacao.execute(
+            "INSERT INTO alteracoes_budget (campanha_id, budget_novo_centimos, motivo, alterado_em) "
+            "VALUES (999, 150000, 'Budget inicial', '2026-11-18 10:00:00')"
+        )
+
+
+def test_apagar_uma_campanha_apaga_o_historico_do_budget_dela(ligacao, contas):
+    campanha_id = _campanha(ligacao, contas)
+    ligacao.execute(
+        "INSERT INTO alteracoes_budget (campanha_id, budget_novo_centimos, motivo, alterado_em) "
+        "VALUES (?, 150000, 'Budget inicial', '2026-11-18 10:00:00')",
+        (campanha_id,),
+    )
+
+    ligacao.execute("DELETE FROM campanhas WHERE id = ?", (campanha_id,))
+
+    assert ligacao.execute("SELECT COUNT(*) FROM alteracoes_budget").fetchone()[0] == 0
