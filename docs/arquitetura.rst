@@ -366,3 +366,25 @@ porque a campanha já é criada com ele.
 O histórico só cresce: as linhas nunca são alteradas. Cada linha guarda o
 budget anterior e o novo, e não a diferença, para se poder ler cada linha
 sozinha.
+
+Resumo global do budget
+-----------------------
+
+O resumo do Administrador não tem tabela própria: é calculado sempre que é
+mostrado, a partir das campanhas e da despesa de cada uma, como a despesa
+(ver `Despesa e budget restante`_).
+:func:`gestor_campanhas.servicos.budget.campanhas_com_despesa` junta cada
+campanha à sua despesa, com as duas consultas de sempre (todas as campanhas e
+a soma dos custos por campanha), e as restantes funções do resumo trabalham
+sobre essa lista:
+
+* :func:`gestor_campanhas.servicos.budget.resumo_por_cliente` agrupa as
+  campanhas por cliente, num
+  :class:`~gestor_campanhas.servicos.budget.ResumoCliente`;
+* :func:`gestor_campanhas.servicos.budget.somar` faz a linha do total;
+* :func:`gestor_campanhas.servicos.budget.campanhas_acima_do_budget` filtra
+  as campanhas cuja despesa passa o budget.
+
+A regra "acima do budget" está num só sítio,
+:func:`gestor_campanhas.servicos.budget.acima_do_budget`: uma campanha sem
+budget nunca está acima do budget.
