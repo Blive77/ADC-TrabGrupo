@@ -2,6 +2,33 @@
 
 Todas as alterações relevantes da aplicação, por versão. Cada versão corresponde a uma fase do projeto.
 
+## v0.5.0 — Budget (2026-11-19)
+
+### Acrescentado
+
+- Pedidos de alteração de budget: o Cliente pede um budget diferente para uma campanha que ainda não terminou, indicando o valor e o motivo. Cada campanha só pode ter um pedido por decidir de cada vez.
+- A opção "Pedidos de campanha" do Cliente mostra os pedidos de nova campanha e, por baixo, os pedidos de alteração de budget, com as opções para pedir, ver e cancelar cada tipo.
+- Parecer do Marketeer: na opção nova "Pedidos de budget", o marketeer responsável vê os pedidos das suas campanhas, com a despesa atual, e diz se cada um é viável, com uma justificação. Com o parecer, o pedido passa a "Em análise".
+- Decisão do Administrador: na opção nova "Pedidos de budget", vê os pedidos de todas as campanhas, com o parecer do marketeer, e aprova-os ou rejeita-os. Aprovar altera logo o budget da campanha para o valor pedido; rejeitar obriga a indicar o motivo.
+- Histórico do budget de cada campanha, com o valor anterior, o valor novo, a data e o motivo de cada alteração, na opção "Campanhas" do Cliente e do Administrador.
+- Resumo global do budget, na opção nova "Resumo do budget" do Administrador: budget atribuído, despesa e restante de cada cliente, com os totais, as campanhas acima do budget em destaque e o detalhe das campanhas de cada cliente.
+- Um pedido de alteração de budget de demonstração e o budget inicial das campanhas de demonstração no histórico.
+
+### Alterado
+
+- "Definir budget", no menu do Administrador, pede o motivo quando a campanha já tem budget, e recusa um valor igual ao atual. Todas as alterações do budget ficam no histórico, incluindo o budget inicial de uma campanha criada a partir de um pedido de campanha.
+- As opções de ver e de cancelar pedidos do Cliente passam a chamar-se "Ver pedido de campanha" e "Cancelar pedido de campanha", porque os pedidos de budget têm as suas próprias opções.
+- Os menus do Marketeer e do Administrador ganharam as opções "Pedidos de budget" e, no Administrador, "Resumo do budget". As opções que vinham a seguir mudaram de número.
+- Uma campanha apagada leva consigo os pedidos de alteração de budget e o histórico do budget dela.
+
+### User stories concluídas
+
+C15, M16, A14, A15, C16 e A16.
+
+Fica também concluída a parte de C06 (os pedidos de alteração de budget na lista de pedidos do cliente) que tinha sido adiada na versão 0.3.0.
+
+O aviso ao cliente quando o pedido de budget é decidido (C17) e o aviso ao marketeer quando chega um pedido de budget (M18) entram na versão 0.6.0, com as notificações. Até lá, o cliente vê a decisão na lista dos seus pedidos.
+
 ## v0.4.0 — Criativos (2026-11-18)
 
 ### Acrescentado
