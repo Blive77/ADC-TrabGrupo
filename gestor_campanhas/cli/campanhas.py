@@ -356,6 +356,9 @@ def pedir_qualquer_campanha(ligacao: sqlite3.Connection) -> Campanha | None:
 def definir_budget(ligacao: sqlite3.Connection) -> None:
     """Pede o número de uma campanha e o budget a atribuir-lhe.
 
+    Se a campanha já tiver budget, pede também o motivo da alteração, que
+    fica registado no histórico do budget.
+
     :param ligacao: Ligação aberta à base de dados.
     """
     comum.titulo("Definir budget")
@@ -364,12 +367,15 @@ def definir_budget(ligacao: sqlite3.Connection) -> None:
         return
     print(f"\nCampanha {campanha.nome}, de {campanha.cliente_nome}. Budget atual: {budget(campanha)}.")
     valor = comum.ler_texto("Budget em euros (por exemplo 1500 ou 1500,50)")
+    motivo = ""
+    if campanha.budget_centimos is not None:
+        motivo = comum.ler_texto("Motivo da alteração")
     try:
-        campanha = campanhas.definir_budget(ligacao, campanha.id, valor)
+        campanha = campanhas.definir_budget(ligacao, campanha.id, valor, motivo)
     except ErroValidacao as erro:
         print(f"\n{erro} O budget não foi alterado.")
     else:
-        print(f"\nBudget definido: {budget(campanha)}.")
+        print(f"\nBudget definido: {budget(campanha)}. A alteração ficou registada no histórico do budget.")
     comum.pausa()
 
 

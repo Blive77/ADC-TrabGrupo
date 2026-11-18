@@ -98,7 +98,7 @@ def test_administrador_define_o_budget_de_uma_campanha(ligacao, natal):
 def test_budget_pode_ser_alterado_mais_tarde(ligacao, natal):
     campanhas.definir_budget(ligacao, natal.id, "1500")
 
-    assert campanhas.definir_budget(ligacao, natal.id, "2000").budget_centimos == 200000
+    assert campanhas.definir_budget(ligacao, natal.id, "2000", "Mais anúncios").budget_centimos == 200000
 
 
 @pytest.mark.parametrize(("valor", "mensagem"), [("muito", "O valor não é válido"), ("0", "maior do que zero")])

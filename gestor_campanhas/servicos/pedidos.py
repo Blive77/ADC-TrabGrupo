@@ -15,6 +15,7 @@ import sqlite3
 from gestor_campanhas import dinheiro, modelos, relogio
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.modelos import PedidoCampanha, Utilizador
+from gestor_campanhas.repositorios import alteracoes_budget
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
 from gestor_campanhas.repositorios import pedidos, utilizadores
 from gestor_campanhas.servicos import campanhas, correio, validacao
@@ -170,6 +171,7 @@ def aprovar(
 
     A campanha fica com o objetivo do pedido, com o prazo do pedido como data
     de fim, com o budget inicial indicado e com o marketeer escolhido. O
+    budget inicial fica registado no histórico do budget da campanha. O
     cliente e o marketeer são avisados por email.
 
     :param ligacao: Ligação aberta à base de dados.
@@ -188,6 +190,9 @@ def aprovar(
     marketeer = campanhas.marketeer_ativo(ligacao, marketeer_id)
     campanha = campanhas_bd.criar(
         ligacao, nome, pedido.objetivo, pedido.cliente_id, marketeer.id, None, pedido.prazo, centimos
+    )
+    alteracoes_budget.registar(
+        ligacao, campanha.id, None, centimos, f"{campanhas.MOTIVO_BUDGET_INICIAL}, do pedido de campanha n.º {pedido.id}"
     )
     pedido = pedidos.definir_estado(ligacao, pedido.id, modelos.APROVADO, campanha_id=campanha.id)
     cliente = utilizadores.obter_por_id(ligacao, pedido.cliente_id)
