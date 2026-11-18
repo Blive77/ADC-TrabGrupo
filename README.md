@@ -24,6 +24,7 @@ O desenvolvimento é feito por fases, cada uma fechada com uma *release*. As fun
 | v0.2.0 | Clientes e marketeers: o Administrador lista, pesquisa, adiciona, edita, desativa e reativa as contas de clientes e de marketeers |
 | v0.3.0 | Campanhas e pedidos de campanha: o Marketeer cria e gere campanhas, o Cliente pede campanhas e acompanha-as, o Administrador decide os pedidos, define o budget e atribui o marketeer |
 | v0.4.0 | Criativos: o Marketeer cria os criativos de cada campanha, com custo, prazo, público-alvo, plataforma e ficheiro; o Cliente vê-os, filtra-os, aprova-os ou rejeita-os e descarrega os ficheiros; a despesa é comparada com o budget |
+| v0.5.0 | Budget: o Cliente pede a alteração do budget de uma campanha, o Marketeer dá parecer e o Administrador decide; o histórico do budget de cada campanha e o resumo global do budget por cliente |
 
 O detalhe de cada versão está no [registo de alterações](CHANGELOG.md).
 
@@ -53,7 +54,7 @@ A aplicação mostra um menu numerado. Escreve-se o número da opção e prime-s
 
 ```
 ============================================================
-Gestor de Campanhas v0.4.0
+Gestor de Campanhas v0.5.0
 ============================================================
   1. Entrar
   2. Recuperar a password
@@ -65,7 +66,7 @@ No primeiro arranque é criada a pasta `dados`, com a base de dados `app.db`. Es
 
 ### Contas de demonstração
 
-Uma instalação nova não tem contas. Para criar as contas, as campanhas, os pedidos e os criativos de demonstração:
+Uma instalação nova não tem contas. Para criar as contas, as campanhas, os pedidos, os criativos e o pedido de budget de demonstração:
 
 ```bash
 python -m gestor_campanhas.dados_demo
@@ -82,7 +83,7 @@ python -m gestor_campanhas.dados_demo
 
 Estas passwords são públicas e servem só para demonstração.
 
-O mesmo comando cria três campanhas, dois pedidos de campanha pendentes e quatro criativos. Pode ser repetido: só acrescenta o que faltar.
+O mesmo comando cria três campanhas, dois pedidos de campanha pendentes, quatro criativos e um pedido de alteração de budget pendente, para a campanha `Natal 2026` passar de 1500 € para 2000 €. Pode ser repetido: só acrescenta o que faltar.
 
 ### Clientes e marketeers
 
@@ -99,7 +100,7 @@ Uma campanha pertence a um cliente e tem um marketeer responsável. Nasce de dua
 
 | Perfil | O que faz |
 |---|---|
-| Administrador | Decide os pedidos, define o budget de cada campanha e atribui o marketeer responsável |
+| Administrador | Decide os pedidos, define o budget inicial de cada campanha e atribui o marketeer responsável |
 | Marketeer | Cria, edita, consulta e elimina as campanhas que lhe estão atribuídas |
 | Cliente | Faz pedidos, acompanha o estado deles, cancela os pendentes e vê as suas campanhas, com o budget e os contactos do marketeer |
 
@@ -123,6 +124,23 @@ Em preparação --> Em revisão --> Aprovado --> Publicado
 A **despesa** de uma campanha é a soma do custo dos seus criativos. As listas de campanhas mostram a despesa e o budget restante, e o Marketeer é avisado quando a despesa passa o budget.
 
 Os ficheiros anexados são copiados para a pasta `dados/ficheiros`. Para experimentar, o projeto tem o ficheiro `exemplos/banner-natal.svg`.
+
+### Budget
+
+O budget de uma campanha é definido pelo Administrador. Para o mudar, o Cliente faz um pedido de alteração de budget, na opção **Pedidos de campanha**, com o valor que pretende e o motivo. O pedido passa por três pessoas:
+
+```
+Cliente pede --> Marketeer dá parecer --> Administrador aprova ou rejeita
+   Pendente         Em análise               Aprovado / Rejeitado
+```
+
+| Perfil | O que faz |
+|---|---|
+| Cliente | Pede a alteração do budget de uma campanha que ainda não terminou, acompanha o pedido, cancela-o enquanto está pendente e vê o histórico do budget de cada campanha |
+| Marketeer | Na opção **Pedidos de budget**, diz se cada pedido das suas campanhas é viável, com uma justificação |
+| Administrador | Na opção **Pedidos de budget**, aprova ou rejeita os pedidos que já têm parecer; em **Campanhas**, altera o budget diretamente e vê o histórico; em **Resumo do budget**, vê o budget atribuído face à despesa de cada cliente e as campanhas acima do budget |
+
+Aprovar um pedido altera logo o budget da campanha. Todas as alterações do budget ficam no histórico da campanha, com o valor anterior, o valor novo, a data e o motivo.
 
 ### Emails
 

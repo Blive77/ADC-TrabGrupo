@@ -136,3 +136,92 @@ def test_pasta_dos_ficheiros_fica_na_pasta_de_dados(monkeypatch, tmp_path):
     monkeypatch.setenv(config.VARIAVEL_PASTA_DADOS, str(tmp_path))
 
     assert config.pasta_ficheiros() == tmp_path / "ficheiros"
+
+
+def _campanha(ligacao, contas):
+    """Cria uma campanha sem budget e devolve o número dela."""
+    cursor = ligacao.execute(
+        "INSERT INTO campanhas (nome, cliente_id, marketeer_id, criada_em) VALUES ('Natal', ?, ?, '2026-11-18')",
+        (contas["cliente"].id, contas["marketeer"].id),
+    )
+    return cursor.lastrowid
+
+
+def test_pedido_de_budget_comeca_pendente_e_sem_parecer(ligacao, contas):
+    campanha_id = _campanha(ligacao, contas)
+    ligacao.execute(
+        "INSERT INTO pedidos_budget (campanha_id, budget_pedido_centimos, motivo, criado_em) "
+        "VALUES (?, 200000, 'Mais anúncios', '2026-11-18 10:00:00')",
+        (campanha_id,),
+    )
+
+    linha = ligacao.execute(
+        "SELECT estado, budget_atual_centimos, parecer_viavel, parecer_justificacao, decidido_em FROM pedidos_budget"
+    ).fetchone()
+    assert tuple(linha) == ("pendente", None, None, "", None)
+
+
+def test_pedido_de_budget_tem_de_ter_uma_campanha_que_existe(ligacao):
+    with pytest.raises(sqlite3.IntegrityError):
+        ligacao.execute(
+            "INSERT INTO pedidos_budget (campanha_id, budget_pedido_centimos, motivo, criado_em) "
+            "VALUES (999, 200000, 'Mais anúncios', '2026-11-18 10:00:00')"
+        )
+
+
+@pytest.mark.parametrize(("coluna", "valor"), [("estado", "perdido"), ("parecer_viavel", 2)])
+def test_pedido_de_budget_so_aceita_valores_previstos(ligacao, contas, coluna, valor):
+    campanha_id = _campanha(ligacao, contas)
+
+    with pytest.raises(sqlite3.IntegrityError):
+        ligacao.execute(
+            f"INSERT INTO pedidos_budget (campanha_id, budget_pedido_centimos, motivo, criado_em, {coluna}) "
+            "VALUES (?, 200000, 'Mais anúncios', '2026-11-18 10:00:00', ?)",
+            (campanha_id, valor),
+        )
+
+
+def test_apagar_uma_campanha_apaga_os_pedidos_de_budget_dela(ligacao, contas):
+    campanha_id = _campanha(ligacao, contas)
+    ligacao.execute(
+        "INSERT INTO pedidos_budget (campanha_id, budget_pedido_centimos, motivo, criado_em) "
+        "VALUES (?, 200000, 'Mais anúncios', '2026-11-18 10:00:00')",
+        (campanha_id,),
+    )
+
+    ligacao.execute("DELETE FROM campanhas WHERE id = ?", (campanha_id,))
+
+    assert ligacao.execute("SELECT COUNT(*) FROM pedidos_budget").fetchone()[0] == 0
+
+
+def test_alteracao_de_budget_pode_nao_ter_valor_anterior_nem_pedido(ligacao, contas):
+    campanha_id = _campanha(ligacao, contas)
+    ligacao.execute(
+        "INSERT INTO alteracoes_budget (campanha_id, budget_novo_centimos, motivo, alterado_em) "
+        "VALUES (?, 150000, 'Budget inicial', '2026-11-18 10:00:00')",
+        (campanha_id,),
+    )
+
+    linha = ligacao.execute("SELECT budget_anterior_centimos, pedido_budget_id FROM alteracoes_budget").fetchone()
+    assert tuple(linha) == (None, None)
+
+
+def test_alteracao_de_budget_tem_de_ter_uma_campanha_que_existe(ligacao):
+    with pytest.raises(sqlite3.IntegrityError):
+        ligacao.execute(
+            "INSERT INTO alteracoes_budget (campanha_id, budget_novo_centimos, motivo, alterado_em) "
+            "VALUES (999, 150000, 'Budget inicial', '2026-11-18 10:00:00')"
+        )
+
+
+def test_apagar_uma_campanha_apaga_o_historico_do_budget_dela(ligacao, contas):
+    campanha_id = _campanha(ligacao, contas)
+    ligacao.execute(
+        "INSERT INTO alteracoes_budget (campanha_id, budget_novo_centimos, motivo, alterado_em) "
+        "VALUES (?, 150000, 'Budget inicial', '2026-11-18 10:00:00')",
+        (campanha_id,),
+    )
+
+    ligacao.execute("DELETE FROM campanhas WHERE id = ?", (campanha_id,))
+
+    assert ligacao.execute("SELECT COUNT(*) FROM alteracoes_budget").fetchone()[0] == 0

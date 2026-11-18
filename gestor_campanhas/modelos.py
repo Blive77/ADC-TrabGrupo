@@ -243,3 +243,87 @@ class Criativo:
     def nome_estado(self) -> str:
         """Nome do estado tal como aparece nas listas, por exemplo ``"Em preparação"``."""
         return NOMES_ESTADOS_CRIATIVO[self.estado]
+
+
+@dataclass
+class PedidoBudget:
+    """Um pedido de alteração do budget de uma campanha, feito pelo cliente dela.
+
+    Usa os mesmos estados de um :class:`PedidoCampanha`.
+
+    :param id: Identificador na base de dados.
+    :param campanha_id: Identificador da campanha cujo budget se quer alterar.
+    :param budget_atual_centimos: Budget da campanha quando o pedido foi
+        feito, em cêntimos, ou ``None`` se ainda não tinha budget.
+    :param budget_pedido_centimos: Budget que o cliente pretende, em cêntimos.
+    :param motivo: Porque é que o cliente quer alterar o budget.
+    :param estado: :data:`PENDENTE`, :data:`EM_ANALISE`, :data:`APROVADO`,
+        :data:`REJEITADO` ou :data:`CANCELADO`.
+    :param criado_em: Data e hora em que o pedido foi feito.
+    :param parecer_viavel: Parecer do marketeer: ``True`` se o pedido é
+        viável, ``False`` se não é, ``None`` enquanto não houver parecer.
+    :param parecer_justificacao: Justificação do parecer do marketeer.
+    :param motivo_rejeicao: Motivo indicado pelo Administrador. Só existe
+        nos pedidos rejeitados.
+    :param decidido_em: Data e hora em que o Administrador decidiu o pedido,
+        ou ``None`` se ainda não o decidiu.
+    :param campanha_nome: Nome da campanha, para mostrar nas listas.
+    :param cliente_id: Identificador do cliente da campanha.
+    :param cliente_nome: Nome do cliente, para mostrar nas listas.
+    :param marketeer_id: Identificador do marketeer responsável pela campanha.
+    :param marketeer_nome: Nome do marketeer responsável, para mostrar nas listas.
+    """
+
+    id: int
+    campanha_id: int
+    budget_atual_centimos: int | None
+    budget_pedido_centimos: int
+    motivo: str
+    estado: str = PENDENTE
+    criado_em: datetime | None = None
+    parecer_viavel: bool | None = None
+    parecer_justificacao: str = ""
+    motivo_rejeicao: str = ""
+    decidido_em: datetime | None = None
+    campanha_nome: str = ""
+    cliente_id: int | None = None
+    cliente_nome: str = ""
+    marketeer_id: int | None = None
+    marketeer_nome: str = ""
+
+    @property
+    def nome_estado(self) -> str:
+        """Nome do estado tal como aparece nas listas, por exemplo ``"Em análise"``."""
+        return NOMES_ESTADOS_PEDIDO[self.estado]
+
+    @property
+    def nome_parecer(self) -> str:
+        """Parecer do marketeer tal como aparece nas listas: ``"Viável"``, ``"Não viável"`` ou ``"Por dar"``."""
+        if self.parecer_viavel is None:
+            return "Por dar"
+        return "Viável" if self.parecer_viavel else "Não viável"
+
+
+@dataclass
+class AlteracaoBudget:
+    """Uma alteração do budget de uma campanha, registada no histórico.
+
+    :param id: Identificador na base de dados.
+    :param campanha_id: Identificador da campanha.
+    :param budget_anterior_centimos: Budget antes da alteração, em cêntimos,
+        ou ``None`` se a campanha ainda não tinha budget.
+    :param budget_novo_centimos: Budget depois da alteração, em cêntimos.
+    :param motivo: Porque é que o budget mudou.
+    :param alterado_em: Data e hora da alteração.
+    :param pedido_budget_id: Identificador do pedido de alteração de budget
+        que deu origem à alteração, ou ``None`` se o Administrador alterou o
+        budget sem pedido.
+    """
+
+    id: int
+    campanha_id: int
+    budget_anterior_centimos: int | None
+    budget_novo_centimos: int
+    motivo: str
+    alterado_em: datetime
+    pedido_budget_id: int | None = None

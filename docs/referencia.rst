@@ -77,6 +77,16 @@ Criativos
 
 .. automodule:: gestor_campanhas.repositorios.criativos
 
+Pedidos de alteração de budget
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.repositorios.pedidos_budget
+
+Histórico do budget
+~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.repositorios.alteracoes_budget
+
 Serviços
 --------
 
@@ -137,6 +147,11 @@ Ficheiros dos criativos
 
 .. automodule:: gestor_campanhas.servicos.ficheiros
 
+Budget
+~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.budget
+
 Dados de demonstração
 ---------------------
 
@@ -186,6 +201,11 @@ Criativos
 ~~~~~~~~~
 
 .. automodule:: gestor_campanhas.cli.criativos
+
+Budget
+~~~~~~
+
+.. automodule:: gestor_campanhas.cli.budget
 
 Opções da conta
 ~~~~~~~~~~~~~~~

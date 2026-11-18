@@ -15,7 +15,7 @@ Estrutura de pastas
      __main__.py          ponto de entrada (python -m gestor_campanhas)
      config.py            caminhos da pasta de dados e da base de dados
      bd.py                ligação SQLite e criação das tabelas
-     modelos.py           classes de dados (Utilizador, Campanha, PedidoCampanha, Criativo), perfis e estados
+     modelos.py           classes de dados (Utilizador, Campanha, PedidoCampanha, Criativo, PedidoBudget), perfis e estados
      erros.py             erros que os menus mostram ao utilizador
      relogio.py           data e hora atuais
      seguranca.py         hash das passwords
@@ -32,6 +32,7 @@ Estrutura de pastas
        campanhas.py       campanhas, nos menus dos três perfis
        criativos.py       criativos, nos menus do Marketeer e do Cliente
        pedidos.py         pedidos de campanha, nos menus do Cliente e do Administrador
+       budget.py          pedidos de alteração de budget
        conta.py           opções da conta, comuns a todos os perfis
        recuperacao.py     recuperação da password
    exemplos/              ficheiros para experimentar a aplicação
@@ -240,12 +241,29 @@ executadas em todos os arranques sem apagar dados.
        ``publicado``), motivo da rejeição e nome do ficheiro anexado. A
        tabela é criada logo com todas as colunas; as que ainda não estão em
        uso ficam vazias.
+   * - ``pedidos_budget``
+     - Uma linha por pedido de alteração de budget: campanha, budget da
+       campanha quando o pedido foi feito, budget pedido (ambos em
+       cêntimos), motivo, estado (os mesmos de ``pedidos_campanha``), parecer
+       do marketeer (``1`` viável, ``0`` não viável, vazio enquanto não for
+       dado) e a justificação, motivo da rejeição e data da decisão. O
+       cliente é o da campanha, por isso não tem coluna própria.
+   * - ``alteracoes_budget``
+     - O histórico do budget: uma linha por alteração, com a campanha, o
+       budget anterior (vazio se não havia), o budget novo, o motivo, a data
+       e, quando a alteração vem de um pedido aprovado, o número do pedido.
 
 Uma campanha com criativos não pode ser apagada: a coluna ``campanha_id`` da
 tabela ``criativos`` aponta para ela, e o SQLite recusa apagar uma linha a
 que outra tabela ainda faz referência. A regra está também em
 :func:`gestor_campanhas.servicos.campanhas.eliminar`, que mostra uma
 mensagem a explicar o que fazer.
+
+Os pedidos de alteração de budget e o histórico do budget, pelo contrário,
+não impedem que a campanha seja apagada. A coluna ``campanha_id`` das tabelas
+``pedidos_budget`` e ``alteracoes_budget`` tem ``ON DELETE CASCADE``: quando
+a campanha é apagada, os pedidos e o histórico dela são apagados com ela,
+porque não fazem sentido sem a campanha.
 
 Estados de um criativo
 ----------------------
@@ -296,3 +314,77 @@ O aviso de budget ultrapassado é preparado por
 :func:`gestor_campanhas.servicos.criativos.aviso_budget` e mostrado pelos
 menus. Não impede guardar o criativo: o custo é uma estimativa, e cabe ao
 marketeer e ao Administrador decidir o que fazer.
+
+Pedidos de alteração de budget
+------------------------------
+
+Um pedido de alteração de budget usa os mesmos estados de um pedido de
+campanha, mas quem o faz avançar é diferente:
+
+.. code-block:: text
+
+   Pendente --(parecer do marketeer)--> Em análise --(o Administrador aprova)--> Aprovado
+      |                                     |
+      |                                     +--------(o Administrador rejeita)--> Rejeitado
+      |
+      +--(o cliente cancela)--> Cancelado
+
+O parecer é guardado no próprio pedido, nas colunas ``parecer_viavel`` e
+``parecer_justificacao``. Enquanto o pedido estiver por decidir, o marketeer
+pode dar outro parecer, que substitui o anterior:
+:func:`gestor_campanhas.servicos.budget.dar_parecer` só recusa pedidos já
+decididos ou cancelados.
+
+O Administrador só decide pedidos com parecer
+(:func:`gestor_campanhas.servicos.budget.aprovar` e
+:func:`gestor_campanhas.servicos.budget.rejeitar`). Aprovar altera o budget
+da campanha para o valor pedido.
+
+O marketeer que vê o pedido é sempre o responsável atual pela campanha: as
+consultas de :mod:`gestor_campanhas.repositorios.pedidos_budget` vão buscar o
+marketeer à tabela ``campanhas``, e não guardam uma cópia no pedido. Se a
+campanha mudar de marketeer, os pedidos mudam com ela.
+
+Histórico do budget
+-------------------
+
+O budget de uma campanha está na coluna ``budget_centimos`` da tabela
+``campanhas``; o histórico está na tabela ``alteracoes_budget``. Para os dois
+nunca ficarem desencontrados, todas as alterações passam por
+:func:`gestor_campanhas.servicos.campanhas.alterar_budget`, que muda o
+budget e regista a alteração de uma só vez. Usam-na:
+
+* :func:`gestor_campanhas.servicos.campanhas.definir_budget`, a opção
+  **Definir budget** do Administrador;
+* :func:`gestor_campanhas.servicos.budget.aprovar`, quando o Administrador
+  aprova um pedido de alteração de budget.
+
+O budget inicial de uma campanha criada a partir de um pedido de campanha é
+registado diretamente em :func:`gestor_campanhas.servicos.pedidos.aprovar`,
+porque a campanha já é criada com ele.
+
+O histórico só cresce: as linhas nunca são alteradas. Cada linha guarda o
+budget anterior e o novo, e não a diferença, para se poder ler cada linha
+sozinha.
+
+Resumo global do budget
+-----------------------
+
+O resumo do Administrador não tem tabela própria: é calculado sempre que é
+mostrado, a partir das campanhas e da despesa de cada uma, como a despesa
+(ver `Despesa e budget restante`_).
+:func:`gestor_campanhas.servicos.budget.campanhas_com_despesa` junta cada
+campanha à sua despesa, com as duas consultas de sempre (todas as campanhas e
+a soma dos custos por campanha), e as restantes funções do resumo trabalham
+sobre essa lista:
+
+* :func:`gestor_campanhas.servicos.budget.resumo_por_cliente` agrupa as
+  campanhas por cliente, num
+  :class:`~gestor_campanhas.servicos.budget.ResumoCliente`;
+* :func:`gestor_campanhas.servicos.budget.somar` faz a linha do total;
+* :func:`gestor_campanhas.servicos.budget.campanhas_acima_do_budget` filtra
+  as campanhas cuja despesa passa o budget.
+
+A regra "acima do budget" está num só sítio,
+:func:`gestor_campanhas.servicos.budget.acima_do_budget`: uma campanha sem
+budget nunca está acima do budget.

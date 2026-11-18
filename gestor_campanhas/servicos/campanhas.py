@@ -12,9 +12,12 @@ from datetime import date
 
 from gestor_campanhas import dinheiro, modelos, relogio
 from gestor_campanhas.erros import ErroValidacao
-from gestor_campanhas.modelos import Campanha, Utilizador
-from gestor_campanhas.repositorios import campanhas, criativos, utilizadores
+from gestor_campanhas.modelos import AlteracaoBudget, Campanha, Utilizador
+from gestor_campanhas.repositorios import alteracoes_budget, campanhas, criativos, utilizadores
 from gestor_campanhas.servicos import correio, gestao, validacao
+
+#: Motivo registado no histórico quando uma campanha recebe o primeiro budget.
+MOTIVO_BUDGET_INICIAL = "Budget inicial"
 
 
 def clientes_disponiveis(ligacao: sqlite3.Connection) -> list[Utilizador]:
@@ -202,17 +205,68 @@ def budget_validado(valor: str) -> int:
     return centimos
 
 
-def definir_budget(ligacao: sqlite3.Connection, identificador: int, valor: str) -> Campanha:
-    """Define o budget de uma campanha. Só o Administrador o faz.
+def alterar_budget(
+    ligacao: sqlite3.Connection,
+    campanha: Campanha,
+    centimos: int,
+    motivo: str,
+    pedido_budget_id: int | None = None,
+) -> Campanha:
+    """Muda o budget de uma campanha e regista a alteração no histórico.
+
+    É o único sítio onde o budget de uma campanha existente muda, para que
+    nenhuma alteração fique fora do histórico. Não valida nada: quem a chama
+    já validou o valor e o motivo.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param campanha: Campanha, ainda com o budget anterior.
+    :param centimos: Budget novo, em cêntimos.
+    :param motivo: Porque é que o budget muda.
+    :param pedido_budget_id: Número do pedido de alteração de budget que deu
+        origem à alteração, se houver.
+    :return: A campanha, já com o budget novo.
+    """
+    alterada = campanhas.definir_budget(ligacao, campanha.id, centimos)
+    alteracoes_budget.registar(ligacao, campanha.id, campanha.budget_centimos, centimos, motivo, pedido_budget_id)
+    return alterada
+
+
+def definir_budget(ligacao: sqlite3.Connection, identificador: int, valor: str, motivo: str = "") -> Campanha:
+    """Define ou altera o budget de uma campanha. Só o Administrador o faz.
+
+    A alteração fica registada no histórico do budget da campanha.
 
     :param ligacao: Ligação aberta à base de dados.
     :param identificador: Número da campanha.
-    :param valor: Budget em euros, tal como foi escrito.
+    :param valor: Budget em euros, tal como foi escrito. Tem de ser diferente
+        do budget atual.
+    :param motivo: Porque é que o budget muda. Obrigatório quando a campanha
+        já tem budget; quando é o primeiro, pode ficar vazio e fica registado
+        :data:`MOTIVO_BUDGET_INICIAL`.
     :return: A campanha, já com o budget novo.
-    :raises ErroValidacao: Se a campanha não existir ou o valor não for válido.
+    :raises ErroValidacao: Se a campanha não existir, se o valor não for
+        válido ou for igual ao atual, ou se faltar o motivo.
     """
     campanha = obter(ligacao, identificador)
-    return campanhas.definir_budget(ligacao, campanha.id, budget_validado(valor))
+    centimos = budget_validado(valor)
+    if centimos == campanha.budget_centimos:
+        raise ErroValidacao("O budget novo é igual ao budget atual.")
+    motivo = motivo.strip()
+    if not motivo:
+        if campanha.budget_centimos is not None:
+            raise ErroValidacao("Indique o motivo da alteração do budget.")
+        motivo = MOTIVO_BUDGET_INICIAL
+    return alterar_budget(ligacao, campanha, centimos, motivo)
+
+
+def historico_budget(ligacao: sqlite3.Connection, campanha: Campanha) -> list[AlteracaoBudget]:
+    """Lista as alterações do budget de uma campanha.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param campanha: Campanha a consultar.
+    :return: Alterações, da mais antiga para a mais recente.
+    """
+    return alteracoes_budget.listar_por_campanha(ligacao, campanha.id)
 
 
 def marketeers_disponiveis(ligacao: sqlite3.Connection) -> list[Utilizador]:

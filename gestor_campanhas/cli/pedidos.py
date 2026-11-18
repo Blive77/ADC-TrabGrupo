@@ -1,8 +1,9 @@
 """Pedidos de nova campanha, nos menus do Cliente e do Administrador.
 
 O Cliente faz pedidos, acompanha o estado deles e pode cancelar os que ainda
-estão pendentes. O Administrador vê os pedidos de todos os clientes e decide
-cada um.
+estão pendentes. Na mesma opção, vê e gere também os seus pedidos de
+alteração de budget (ver :mod:`gestor_campanhas.cli.budget`). O
+Administrador vê os pedidos de todos os clientes e decide cada um.
 """
 
 from __future__ import annotations
@@ -10,9 +11,10 @@ from __future__ import annotations
 import sqlite3
 
 from gestor_campanhas import dinheiro, modelos
-from gestor_campanhas.cli import comum
+from gestor_campanhas.cli import budget, comum
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.modelos import PedidoCampanha, Utilizador
+from gestor_campanhas.servicos import budget as servico_budget
 from gestor_campanhas.servicos import campanhas, pedidos
 
 #: Número máximo de caracteres do objetivo que cabem na lista de pedidos.
@@ -182,17 +184,44 @@ def cancelar(ligacao: sqlite3.Connection, cliente: Utilizador) -> None:
 #: ``(descrição, função)``; a função recebe a ligação à base de dados e o
 #: cliente.
 ACOES = [
-    ("Novo pedido", novo),
-    ("Ver pedido", ver),
-    ("Cancelar pedido", cancelar),
+    ("Novo pedido de campanha", novo),
+    ("Ver pedido de campanha", ver),
+    ("Cancelar pedido de campanha", cancelar),
+    ("Pedir alteração de budget", budget.pedir_alteracao),
+    ("Ver pedido de budget", budget.ver_pedido),
+    ("Cancelar pedido de budget", budget.cancelar_pedido),
 ]
+
+
+def mostrar_todos_do_cliente(ligacao: sqlite3.Connection, cliente: Utilizador) -> None:
+    """Mostra os pedidos de um cliente: os de nova campanha e, por baixo, os de alteração de budget.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param cliente: Cliente que está a consultar.
+    """
+    de_campanha = pedidos.listar_do_cliente(ligacao, cliente)
+    de_budget = servico_budget.listar_do_cliente(ligacao, cliente)
+    if not de_campanha and not de_budget:
+        print("Ainda não fez nenhum pedido.")
+        return
+    print("Pedidos de nova campanha\n")
+    if de_campanha:
+        mostrar_pedidos(de_campanha)
+    else:
+        print("Nenhum.")
+    print("\nPedidos de alteração de budget\n")
+    if de_budget:
+        budget.mostrar_pedidos_do_cliente(de_budget)
+    else:
+        print("Nenhum.")
 
 
 def do_cliente(ligacao: sqlite3.Connection, utilizador: Utilizador) -> None:
     """Opção "Pedidos de campanha" do menu do Cliente.
 
-    Mostra os pedidos do cliente e as opções para os gerir. A lista volta a
-    aparecer depois de cada opção, já com as alterações.
+    Mostra os pedidos de nova campanha e os pedidos de alteração de budget
+    do cliente, e as opções para os gerir. As listas voltam a aparecer
+    depois de cada opção, já com as alterações.
 
     :param ligacao: Ligação aberta à base de dados.
     :param utilizador: Cliente que está a usar o menu.
@@ -201,11 +230,7 @@ def do_cliente(ligacao: sqlite3.Connection, utilizador: Utilizador) -> None:
     menu.append(("0", "Voltar"))
     while True:
         comum.titulo("Os meus pedidos de campanha")
-        lista = pedidos.listar_do_cliente(ligacao, utilizador)
-        if lista:
-            mostrar_pedidos(lista)
-        else:
-            print("Ainda não fez nenhum pedido.")
+        mostrar_todos_do_cliente(ligacao, utilizador)
         escolha = comum.escolher_opcao("Pedidos de campanha", menu)
         if escolha == "0":
             return
