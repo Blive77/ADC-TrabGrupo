@@ -4,6 +4,10 @@ O cliente de uma campanha pode pedir que o budget dela seja alterado,
 indicando o valor que pretende e o motivo. O pedido começa no estado
 pendente; enquanto estiver pendente, o cliente pode cancelá-lo.
 
+O marketeer responsável pela campanha dá o seu parecer: diz se o pedido é
+viável e porquê. Com o parecer, o pedido passa a estar em análise e o cliente
+deixa de o poder cancelar.
+
 Cada campanha só pode ter um pedido de cada vez à espera de decisão, para
 não haver dois valores pedidos ao mesmo tempo para o mesmo budget.
 """
@@ -119,3 +123,57 @@ def cancelar(ligacao: sqlite3.Connection, cliente: Utilizador, identificador: in
             f"Só é possível cancelar um pedido pendente. Este pedido está no estado {pedido.nome_estado}."
         )
     return pedidos_budget.definir_estado(ligacao, pedido.id, modelos.CANCELADO)
+
+
+def listar_do_marketeer(ligacao: sqlite3.Connection, marketeer: Utilizador) -> list[PedidoBudget]:
+    """Lista os pedidos de alteração de budget das campanhas de um marketeer.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param marketeer: Marketeer que está a consultar.
+    :return: Primeiro os pedidos por decidir, depois os já decididos ou
+        cancelados; dentro de cada grupo, do mais antigo para o mais recente.
+    """
+    todos = pedidos_budget.listar_por_marketeer(ligacao, marketeer.id)
+    return sorted(todos, key=lambda pedido: (pedido.estado not in POR_DECIDIR, pedido.id))
+
+
+def obter_do_marketeer(ligacao: sqlite3.Connection, marketeer: Utilizador, identificador: int) -> PedidoBudget:
+    """Procura um pedido de alteração de budget, confirmando que é de uma campanha do marketeer.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param marketeer: Marketeer que está a consultar.
+    :param identificador: Número do pedido.
+    :return: O pedido.
+    :raises ErroValidacao: Se não houver nenhum pedido com esse número nas
+        campanhas do marketeer.
+    """
+    pedido = pedidos_budget.obter_por_id(ligacao, identificador)
+    if pedido is None or pedido.marketeer_id != marketeer.id:
+        raise ErroValidacao(f"Não há nenhum pedido de budget com o número {identificador} nas suas campanhas.")
+    return pedido
+
+
+def dar_parecer(
+    ligacao: sqlite3.Connection, marketeer: Utilizador, identificador: int, viavel: bool, justificacao: str
+) -> PedidoBudget:
+    """Guarda o parecer do marketeer sobre um pedido de alteração de budget.
+
+    O pedido passa a estar em análise. Enquanto o Administrador não o
+    decidir, o marketeer pode mudar o parecer: o novo substitui o anterior.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param marketeer: Marketeer responsável pela campanha do pedido.
+    :param identificador: Número do pedido.
+    :param viavel: ``True`` se o pedido é viável, ``False`` se não é.
+    :param justificacao: Porque é que é, ou não é, viável. Obrigatória.
+    :return: O pedido, já com o parecer.
+    :raises ErroValidacao: Se o pedido não for de uma campanha do marketeer,
+        se já tiver sido decidido ou cancelado, ou se a justificação ficar vazia.
+    """
+    pedido = obter_do_marketeer(ligacao, marketeer, identificador)
+    if pedido.estado not in POR_DECIDIR:
+        raise ErroValidacao(f"Este pedido já não aceita parecer: está no estado {pedido.nome_estado}.")
+    justificacao = justificacao.strip()
+    if not justificacao:
+        raise ErroValidacao("A justificação do parecer não pode ficar vazia.")
+    return pedidos_budget.definir_parecer(ligacao, pedido.id, viavel, justificacao, modelos.EM_ANALISE)

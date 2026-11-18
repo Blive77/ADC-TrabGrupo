@@ -295,6 +295,84 @@ def test_cliente_nao_cancela_pedidos_de_outro(ligacao, pedido, jose):
     assert repositorio.obter_por_id(ligacao, pedido.id).estado == modelos.PENDENTE
 
 
+# --- parecer do marketeer ----------------------------------------------------
+
+
+@pytest.fixture
+def marta(ligacao):
+    """Uma segunda marketeer, sem campanhas."""
+    return utilizadores.criar(
+        ligacao, "Marta Marques", "marta@agencia.pt", seguranca.gerar_hash(PASSWORD_TESTE), modelos.MARKETEER
+    )
+
+
+def test_marketeer_da_parecer_e_o_pedido_fica_em_analise(ligacao, contas, pedido):
+    miguel = contas[modelos.MARKETEER]
+
+    com_parecer = servico.dar_parecer(ligacao, miguel, pedido.id, True, "  Há margem para mais vídeo ")
+
+    assert com_parecer.parecer_viavel is True
+    assert com_parecer.parecer_justificacao == "Há margem para mais vídeo"
+    assert com_parecer.estado == modelos.EM_ANALISE
+
+
+def test_marketeer_pode_mudar_o_parecer_antes_da_decisao(ligacao, contas, pedido):
+    miguel = contas[modelos.MARKETEER]
+    servico.dar_parecer(ligacao, miguel, pedido.id, True, "Há margem")
+
+    novo = servico.dar_parecer(ligacao, miguel, pedido.id, False, "Afinal os criativos não ficam prontos")
+
+    assert novo.parecer_viavel is False
+    assert novo.parecer_justificacao == "Afinal os criativos não ficam prontos"
+    assert novo.estado == modelos.EM_ANALISE
+
+
+def test_depois_do_parecer_o_cliente_ja_nao_cancela(ligacao, contas, pedido):
+    servico.dar_parecer(ligacao, contas[modelos.MARKETEER], pedido.id, True, "Há margem")
+
+    with pytest.raises(ErroValidacao, match="Este pedido está no estado Em análise"):
+        servico.cancelar(ligacao, contas[modelos.CLIENTE], pedido.id)
+
+
+def test_parecer_sem_justificacao_nao_e_guardado(ligacao, contas, pedido):
+    with pytest.raises(ErroValidacao, match="A justificação do parecer não pode ficar vazia"):
+        servico.dar_parecer(ligacao, contas[modelos.MARKETEER], pedido.id, True, "   ")
+
+    assert repositorio.obter_por_id(ligacao, pedido.id).parecer_viavel is None
+
+
+@pytest.mark.parametrize("estado", [modelos.APROVADO, modelos.REJEITADO, modelos.CANCELADO])
+def test_pedido_decidido_ou_cancelado_nao_aceita_parecer(ligacao, contas, pedido, estado):
+    repositorio.definir_estado(ligacao, pedido.id, estado)
+
+    with pytest.raises(ErroValidacao, match="Este pedido já não aceita parecer"):
+        servico.dar_parecer(ligacao, contas[modelos.MARKETEER], pedido.id, True, "Há margem")
+
+
+def test_marketeer_so_da_parecer_nas_suas_campanhas(ligacao, pedido, marta):
+    with pytest.raises(ErroValidacao, match=f"Não há nenhum pedido de budget com o número {pedido.id} nas suas campanhas"):
+        servico.dar_parecer(ligacao, marta, pedido.id, True, "Há margem")
+
+    assert repositorio.obter_por_id(ligacao, pedido.id).parecer_viavel is None
+
+
+def test_marketeer_novo_da_campanha_passa_a_ver_o_pedido(ligacao, contas, pedido, natal, marta):
+    campanhas_bd.definir_marketeer(ligacao, natal.id, marta.id)
+
+    assert servico.listar_do_marketeer(ligacao, marta) == [repositorio.obter_por_id(ligacao, pedido.id)]
+    assert servico.listar_do_marketeer(ligacao, contas[modelos.MARKETEER]) == []
+
+
+def test_lista_do_marketeer_mostra_primeiro_os_por_decidir(ligacao, contas, natal, padaria):
+    miguel = contas[modelos.MARKETEER]
+    antigo = repositorio.criar(ligacao, natal.id, 150000, 200000, "Antigo")
+    repositorio.definir_estado(ligacao, antigo.id, modelos.CANCELADO)
+    do_jose = repositorio.criar(ligacao, padaria.id, None, 50000, "Do José")
+    novo = repositorio.criar(ligacao, natal.id, 150000, 180000, "Novo")
+
+    assert [p.id for p in servico.listar_do_marketeer(ligacao, miguel)] == [do_jose.id, novo.id, antigo.id]
+
+
 # --- menu do cliente ---------------------------------------------------------
 
 
