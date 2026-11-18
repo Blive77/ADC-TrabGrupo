@@ -5,7 +5,9 @@ from datetime import date, datetime
 import pytest
 
 from gestor_campanhas import modelos, relogio
+from gestor_campanhas.cli import budget as menu
 from gestor_campanhas.cli import campanhas as menu_campanhas
+from gestor_campanhas.cli import perfis
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import alteracoes_budget as historico_bd
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
@@ -258,3 +260,122 @@ def test_lista_do_administrador_mostra_primeiro_os_por_decidir(ligacao, contas, 
     novo = pedidos_bd.criar(ligacao, outra.id, None, 50000, "Começar")
 
     assert [p.id for p in servico.listar_todos(ligacao)] == [novo.id, pedido.id]
+
+
+# --- menu do administrador ---------------------------------------------------
+
+
+def test_opcao_pedidos_de_budget_esta_no_menu_do_administrador():
+    opcoes = perfis.OPCOES[modelos.ADMINISTRADOR]
+    descricoes = [descricao for descricao, _ in opcoes]
+
+    assert descricoes.index("Pedidos de budget") == descricoes.index("Pedidos de campanha") + 1
+    assert dict(opcoes)["Pedidos de budget"] is menu.do_administrador
+
+
+def test_menu_do_administrador_sem_pedidos(teclado, ligacao, contas, capsys):
+    teclado("0")
+
+    menu.do_administrador(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    assert "Pedidos de alteração de budget de todos os clientes" in saida
+    assert "Ainda não há pedidos de alteração de budget." in saida
+    assert "1. Analisar pedido" in saida
+
+
+def test_menu_do_administrador_mostra_os_pedidos_com_o_parecer(teclado, ligacao, contas, pedido, capsys):
+    teclado("0")
+
+    menu.do_administrador(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    assert f"{pedido.id}    2026-11-18  Natal 2026  Carla Cliente  1 500,00 €  2 000,00 €  Em análise  Viável" in saida
+    assert "1 pedido, 1 por decidir." in saida
+
+
+def test_menu_aprova_um_pedido(teclado, ligacao, contas, natal, pedido, capsys):
+    teclado("1", str(pedido.id), "1", "", "0")
+
+    menu.do_administrador(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    assert "  Parecer:      Viável" in saida
+    assert "  Justificação: Há margem" in saida
+    assert "Budget atual da campanha: 1 500,00 €. Despesa: 0,00 €." in saida
+    assert "1. Aprovar e passar o budget para 2 000,00 €" in saida
+    assert "Pedido aprovado. O budget da campanha Natal 2026 passou a 2 000,00 €." in saida
+    assert "A alteração ficou registada no histórico do budget." in saida
+    assert campanhas.obter(ligacao, natal.id).budget_centimos == 200000
+    assert f"{pedido.id}    2026-11-18  Natal 2026  Carla Cliente  1 500,00 €  2 000,00 €  Aprovado  Viável" in saida
+
+
+def test_menu_rejeita_um_pedido(teclado, ligacao, contas, natal, pedido, capsys):
+    teclado("1", str(pedido.id), "2", "Sem margem este ano", "s", "", "0")
+
+    menu.do_administrador(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    assert "Pedido rejeitado. O budget da campanha não mudou." in saida
+    rejeitado = pedidos_bd.obter_por_id(ligacao, pedido.id)
+    assert rejeitado.estado == modelos.REJEITADO
+    assert rejeitado.motivo_rejeicao == "Sem margem este ano"
+    assert campanhas.obter(ligacao, natal.id).budget_centimos == 150000
+
+
+def test_menu_nao_rejeita_sem_confirmacao(teclado, ligacao, pedido, capsys):
+    teclado(str(pedido.id), "2", "Sem margem", "n", "")
+
+    menu.decidir(ligacao)
+
+    assert "O pedido não foi rejeitado." in capsys.readouterr().out
+    assert pedidos_bd.obter_por_id(ligacao, pedido.id).estado == modelos.EM_ANALISE
+
+
+def test_menu_decidir_mais_tarde_deixa_o_pedido_em_analise(teclado, ligacao, pedido, capsys):
+    teclado(str(pedido.id), "0", "")
+
+    menu.decidir(ligacao)
+
+    assert "O pedido fica em análise." in capsys.readouterr().out
+    assert pedidos_bd.obter_por_id(ligacao, pedido.id).estado == modelos.EM_ANALISE
+
+
+def test_menu_nao_deixa_decidir_sem_parecer(teclado, ligacao, natal, capsys):
+    sem_parecer = pedidos_bd.criar(ligacao, natal.id, 150000, 200000, "Mais anúncios")
+    teclado(str(sem_parecer.id), "")
+
+    menu.decidir(ligacao)
+
+    saida = capsys.readouterr().out
+    assert "  Parecer:      Por dar" in saida
+    assert "Este pedido ainda não tem o parecer do marketeer. Só pode ser decidido depois do parecer." in saida
+    assert "Decisão" not in saida
+
+
+def test_menu_nao_deixa_decidir_um_pedido_ja_decidido(teclado, ligacao, pedido, capsys):
+    servico.rejeitar(ligacao, pedido.id, "Sem margem")
+    teclado(str(pedido.id), "")
+
+    menu.decidir(ligacao)
+
+    saida = capsys.readouterr().out
+    assert "  Rejeição:     Sem margem" in saida
+    assert "Este pedido já não pode ser decidido." in saida
+
+
+def test_menu_mostra_o_erro_quando_o_pedido_nao_existe(teclado, ligacao, capsys):
+    teclado("999", "")
+
+    menu.decidir(ligacao)
+
+    assert "Não existe nenhum pedido de budget com o número 999." in capsys.readouterr().out
+
+
+def test_menu_mostra_o_erro_da_aprovacao(teclado, ligacao, natal, pedido, capsys):
+    campanhas.definir_budget(ligacao, natal.id, "2000", "Já acordado")
+    teclado(str(pedido.id), "1", "")
+
+    menu.decidir(ligacao)
+
+    assert "Este pedido já não altera nada: rejeite-o, indicando o motivo. O pedido não foi aprovado." in capsys.readouterr().out
