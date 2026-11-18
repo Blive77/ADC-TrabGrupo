@@ -82,6 +82,11 @@ Pedidos de alteração de budget
 
 .. automodule:: gestor_campanhas.repositorios.pedidos_budget
 
+Histórico do budget
+~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.repositorios.alteracoes_budget
+
 Serviços
 --------
 

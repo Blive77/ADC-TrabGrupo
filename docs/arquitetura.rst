@@ -248,6 +248,10 @@ executadas em todos os arranques sem apagar dados.
        do marketeer (``1`` viável, ``0`` não viável, vazio enquanto não for
        dado) e a justificação, motivo da rejeição e data da decisão. O
        cliente é o da campanha, por isso não tem coluna própria.
+   * - ``alteracoes_budget``
+     - O histórico do budget: uma linha por alteração, com a campanha, o
+       budget anterior (vazio se não havia), o budget novo, o motivo, a data
+       e, quando a alteração vem de um pedido aprovado, o número do pedido.
 
 Uma campanha com criativos não pode ser apagada: a coluna ``campanha_id`` da
 tabela ``criativos`` aponta para ela, e o SQLite recusa apagar uma linha a
@@ -255,10 +259,11 @@ que outra tabela ainda faz referência. A regra está também em
 :func:`gestor_campanhas.servicos.campanhas.eliminar`, que mostra uma
 mensagem a explicar o que fazer.
 
-Os pedidos de alteração de budget, pelo contrário, não impedem que a
-campanha seja apagada. A coluna ``campanha_id`` da tabela ``pedidos_budget``
-tem ``ON DELETE CASCADE``: quando a campanha é apagada, os pedidos dela são
-apagados com ela, porque não fazem sentido sem a campanha.
+Os pedidos de alteração de budget e o histórico do budget, pelo contrário,
+não impedem que a campanha seja apagada. A coluna ``campanha_id`` das tabelas
+``pedidos_budget`` e ``alteracoes_budget`` tem ``ON DELETE CASCADE``: quando
+a campanha é apagada, os pedidos e o histórico dela são apagados com ela,
+porque não fazem sentido sem a campanha.
 
 Estados de um criativo
 ----------------------
@@ -318,7 +323,9 @@ campanha, mas quem o faz avançar é diferente:
 
 .. code-block:: text
 
-   Pendente --(parecer do marketeer)--> Em análise
+   Pendente --(parecer do marketeer)--> Em análise --(o Administrador aprova)--> Aprovado
+      |                                     |
+      |                                     +--------(o Administrador rejeita)--> Rejeitado
       |
       +--(o cliente cancela)--> Cancelado
 
@@ -328,7 +335,34 @@ pode dar outro parecer, que substitui o anterior:
 :func:`gestor_campanhas.servicos.budget.dar_parecer` só recusa pedidos já
 decididos ou cancelados.
 
+O Administrador só decide pedidos com parecer
+(:func:`gestor_campanhas.servicos.budget.aprovar` e
+:func:`gestor_campanhas.servicos.budget.rejeitar`). Aprovar altera o budget
+da campanha para o valor pedido.
+
 O marketeer que vê o pedido é sempre o responsável atual pela campanha: as
 consultas de :mod:`gestor_campanhas.repositorios.pedidos_budget` vão buscar o
 marketeer à tabela ``campanhas``, e não guardam uma cópia no pedido. Se a
 campanha mudar de marketeer, os pedidos mudam com ela.
+
+Histórico do budget
+-------------------
+
+O budget de uma campanha está na coluna ``budget_centimos`` da tabela
+``campanhas``; o histórico está na tabela ``alteracoes_budget``. Para os dois
+nunca ficarem desencontrados, todas as alterações passam por
+:func:`gestor_campanhas.servicos.campanhas.alterar_budget`, que muda o
+budget e regista a alteração de uma só vez. Usam-na:
+
+* :func:`gestor_campanhas.servicos.campanhas.definir_budget`, a opção
+  **Definir budget** do Administrador;
+* :func:`gestor_campanhas.servicos.budget.aprovar`, quando o Administrador
+  aprova um pedido de alteração de budget.
+
+O budget inicial de uma campanha criada a partir de um pedido de campanha é
+registado diretamente em :func:`gestor_campanhas.servicos.pedidos.aprovar`,
+porque a campanha já é criada com ele.
+
+O histórico só cresce: as linhas nunca são alteradas. Cada linha guarda o
+budget anterior e o novo, e não a diferença, para se poder ler cada linha
+sozinha.
