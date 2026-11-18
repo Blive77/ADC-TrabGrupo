@@ -5,6 +5,8 @@ from datetime import date, datetime
 import pytest
 
 from gestor_campanhas import modelos, relogio, seguranca
+from gestor_campanhas.cli import budget as menu
+from gestor_campanhas.cli import perfis
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
 from gestor_campanhas.repositorios import criativos as criativos_bd
@@ -159,3 +161,82 @@ def test_campanhas_de_um_cliente_sem_campanhas_da_erro(ligacao, campanhas_demo, 
 
     with pytest.raises(ErroValidacao, match=f"Não há nenhum cliente com campanhas com o número {numero}"):
         servico.campanhas_do_cliente(ligacao, numero)
+
+
+# --- menu do administrador ---------------------------------------------------
+
+
+def test_opcao_resumo_do_budget_esta_no_menu_do_administrador():
+    opcoes = perfis.OPCOES[modelos.ADMINISTRADOR]
+    descricoes = [descricao for descricao, _ in opcoes]
+
+    assert descricoes.index("Resumo do budget") == descricoes.index("Campanhas") + 1
+    assert dict(opcoes)["Resumo do budget"] is menu.resumo
+
+
+def test_resumo_sem_campanhas_avisa_e_volta(teclado, ligacao, contas, capsys):
+    teclado("")
+
+    menu.resumo(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    assert "Resumo global do budget" in saida
+    assert "Ainda não há campanhas." in saida
+
+
+def test_resumo_mostra_os_clientes_e_os_totais(teclado, ligacao, contas, clientes, campanhas_demo, capsys):
+    teclado("0")
+
+    menu.resumo(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    carla, jose = clientes["carla"].id, clientes["jose"].id
+    assert "N.º  Cliente        Campanhas  Budget      Despesa     Restante   Sem budget  Acima do budget" in saida
+    assert f"{carla}    Carla Cliente  3          2 000,00 €  2 200,00 €  -200,00 €  1           1" in saida
+    assert f"{jose}    José Padeiro   1          800,00 €    300,00 €    500,00 €   0           0" in saida
+    assert "Total: 4 campanhas, budget atribuído 2 800,00 €, despesa 2 500,00 €, restante 300,00 €." in saida
+    assert "O budget é a soma das campanhas que já têm budget; a despesa conta todas as campanhas." in saida
+
+
+def test_resumo_destaca_as_campanhas_acima_do_budget(teclado, ligacao, contas, campanhas_demo, capsys):
+    teclado("0")
+
+    menu.resumo(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    pascoa = campanhas_demo["pascoa"].id
+    assert "Acima do budget\n\nN.º  Campanha  Cliente        Budget    Despesa   Restante   Situação" in saida
+    assert f"{pascoa}    Páscoa    Carla Cliente  500,00 €  700,00 €  -200,00 €  Acima do budget" in saida
+    assert "Natal 2026" not in saida.split("Acima do budget\n\n")[1]
+
+
+def test_resumo_diz_quando_nenhuma_campanha_esta_acima_do_budget(teclado, ligacao, contas, clientes, capsys):
+    campanhas_bd.criar(ligacao, "Natal", "", clientes["carla"].id, contas[modelos.MARKETEER].id, None, None, 100000)
+    teclado("0")
+
+    menu.resumo(ligacao, contas[modelos.ADMINISTRADOR])
+
+    assert "Nenhuma campanha está acima do budget." in capsys.readouterr().out
+
+
+def test_resumo_mostra_as_campanhas_de_um_cliente(teclado, ligacao, contas, clientes, campanhas_demo, capsys):
+    teclado("1", str(clientes["carla"].id), "", "0")
+
+    menu.resumo(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    natal, saldos, pascoa = (campanhas_demo[nome].id for nome in ("natal", "saldos", "pascoa"))
+    assert "Campanhas de Carla Cliente" in saida
+    assert "N.º  Campanha    Budget       Despesa     Restante     Situação" in saida
+    assert f"{natal}    Natal 2026  1 500,00 €   1 300,00 €  200,00 €     Dentro do budget" in saida
+    assert f"{saldos}    Saldos      Por definir  200,00 €    Por definir  Sem budget" in saida
+    assert f"{pascoa}    Páscoa      500,00 €     700,00 €    -200,00 €    Acima do budget" in saida
+    assert "3 campanhas." in saida
+
+
+def test_resumo_mostra_o_erro_de_um_cliente_sem_campanhas(teclado, ligacao, contas, clientes, campanhas_demo, capsys):
+    teclado("1", str(clientes["beatriz"].id), "", "0")
+
+    menu.resumo(ligacao, contas[modelos.ADMINISTRADOR])
+
+    assert f"Não há nenhum cliente com campanhas com o número {clientes['beatriz'].id}." in capsys.readouterr().out

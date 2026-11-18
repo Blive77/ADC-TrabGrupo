@@ -10,6 +10,8 @@ parecer sobre cada um, na opção "Pedidos de budget".
 
 O Administrador vê os pedidos de todas as campanhas, com o parecer do
 marketeer, e aprova-os ou rejeita-os, também na opção "Pedidos de budget".
+Na opção "Resumo do budget", vê o budget atribuído face à despesa, por
+cliente e por campanha, com as campanhas acima do budget em destaque.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ import sqlite3
 from gestor_campanhas import dinheiro, modelos, relogio
 from gestor_campanhas.cli import comum
 from gestor_campanhas.erros import ErroValidacao
-from gestor_campanhas.modelos import PedidoBudget, Utilizador
+from gestor_campanhas.modelos import Campanha, PedidoBudget, Utilizador
 from gestor_campanhas.servicos import budget, campanhas, criativos
 
 
@@ -385,3 +387,121 @@ def do_administrador(ligacao: sqlite3.Connection, utilizador: Utilizador) -> Non
         if escolha == "0":
             return
         decidir(ligacao)
+
+
+#: Texto da coluna "Situação" das campanhas que gastaram mais do que o budget.
+ACIMA_DO_BUDGET = "Acima do budget"
+
+
+def situacao(campanha: Campanha, gasto: int) -> str:
+    """Escreve a situação de uma campanha face ao budget, para a coluna "Situação".
+
+    :param campanha: Campanha a descrever.
+    :param gasto: Despesa da campanha, em cêntimos.
+    :return: :data:`ACIMA_DO_BUDGET`, ``"Sem budget"`` ou ``"Dentro do budget"``.
+    """
+    if campanha.budget_centimos is None:
+        return "Sem budget"
+    return ACIMA_DO_BUDGET if budget.acima_do_budget(campanha, gasto) else "Dentro do budget"
+
+
+def mostrar_resumo(resumos: list[budget.ResumoCliente]) -> None:
+    """Mostra a tabela do resumo por cliente e, por baixo, os totais.
+
+    :param resumos: Resumo de cada cliente, como devolvido por
+        :func:`gestor_campanhas.servicos.budget.resumo_por_cliente`.
+    """
+    comum.mostrar_tabela(
+        ["N.º", "Cliente", "Campanhas", "Budget", "Despesa", "Restante", "Sem budget", "Acima do budget"],
+        [
+            [
+                str(resumo.cliente_id),
+                resumo.cliente_nome,
+                str(resumo.campanhas),
+                dinheiro.formatar(resumo.budget_centimos),
+                dinheiro.formatar(resumo.despesa_centimos),
+                dinheiro.formatar(resumo.restante_centimos),
+                str(resumo.sem_budget),
+                str(resumo.acima_do_budget),
+            ]
+            for resumo in resumos
+        ],
+    )
+    total = budget.somar(resumos)
+    print(
+        f"\nTotal: {total.campanhas} {'campanha' if total.campanhas == 1 else 'campanhas'}, "
+        f"budget atribuído {dinheiro.formatar(total.budget_centimos)}, "
+        f"despesa {dinheiro.formatar(total.despesa_centimos)}, "
+        f"restante {dinheiro.formatar(total.restante_centimos)}."
+    )
+    print("O budget é a soma das campanhas que já têm budget; a despesa conta todas as campanhas.")
+
+
+def mostrar_campanhas_com_despesa(lista: list[tuple[Campanha, int]], com_cliente: bool = True) -> None:
+    """Mostra uma tabela de campanhas com o budget, a despesa, o restante e a situação de cada uma.
+
+    :param lista: Pares ``(campanha, despesa em cêntimos)``.
+    :param com_cliente: ``False`` para não mostrar a coluna do cliente, quando
+        as campanhas são todas do mesmo cliente.
+    """
+    cabecalhos = ["N.º", "Campanha"] + (["Cliente"] if com_cliente else [])
+    cabecalhos += ["Budget", "Despesa", "Restante", "Situação"]
+    linhas = []
+    for campanha, gasto in lista:
+        restante = None if campanha.budget_centimos is None else campanha.budget_centimos - gasto
+        linha = [str(campanha.id), campanha.nome] + ([campanha.cliente_nome] if com_cliente else [])
+        linha += [valor(campanha.budget_centimos), dinheiro.formatar(gasto), valor(restante), situacao(campanha, gasto)]
+        linhas.append(linha)
+    comum.mostrar_tabela(cabecalhos, linhas)
+
+
+def ver_cliente(ligacao: sqlite3.Connection) -> None:
+    """Pede o número de um cliente do resumo e mostra as campanhas dele, uma a uma.
+
+    :param ligacao: Ligação aberta à base de dados.
+    """
+    comum.titulo("Budget das campanhas de um cliente")
+    numero = comum.ler_numero("Número do cliente (Enter para cancelar)")
+    if numero is None:
+        return
+    try:
+        lista = budget.campanhas_do_cliente(ligacao, numero)
+    except ErroValidacao as erro:
+        print(f"\n{erro}")
+        comum.pausa()
+        return
+    print(f"\nCampanhas de {lista[0][0].cliente_nome}\n")
+    mostrar_campanhas_com_despesa(lista, com_cliente=False)
+    print(f"\n{len(lista)} {'campanha' if len(lista) == 1 else 'campanhas'}.")
+    comum.pausa()
+
+
+def resumo(ligacao: sqlite3.Connection, utilizador: Utilizador) -> None:
+    """Opção "Resumo do budget" do menu do Administrador.
+
+    Mostra, para cada cliente com campanhas, o budget atribuído, a despesa e
+    o restante, com os totais por baixo. A seguir destaca as campanhas que já
+    gastaram mais do que o budget. Daqui pode ver-se o detalhe das campanhas
+    de cada cliente.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param utilizador: Administrador que está a usar o menu.
+    """
+    while True:
+        comum.titulo("Resumo global do budget")
+        resumos = budget.resumo_por_cliente(ligacao)
+        if not resumos:
+            print("Ainda não há campanhas.")
+            comum.pausa()
+            return
+        mostrar_resumo(resumos)
+        acima = budget.campanhas_acima_do_budget(ligacao)
+        if acima:
+            print(f"\n{ACIMA_DO_BUDGET}\n")
+            mostrar_campanhas_com_despesa(acima)
+        else:
+            print("\nNenhuma campanha está acima do budget.")
+        escolha = comum.escolher_opcao("Resumo do budget", [("1", "Ver as campanhas de um cliente"), ("0", "Voltar")])
+        if escolha == "0":
+            return
+        ver_cliente(ligacao)

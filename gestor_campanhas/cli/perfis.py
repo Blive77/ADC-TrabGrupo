@@ -29,6 +29,7 @@ OPCOES: dict[str, list] = {
         ("Pedidos de campanha", pedidos.do_administrador),
         ("Pedidos de budget", budget.do_administrador),
         ("Campanhas", campanhas.do_administrador),
+        ("Resumo do budget", budget.resumo),
         ("Horários de entrada e saída dos marketeers", admin.horarios),
         *OPCOES_DA_CONTA,
     ],
