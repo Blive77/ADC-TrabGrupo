@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 import pytest
 
-from gestor_campanhas import modelos, relogio, seguranca
+from gestor_campanhas import config, dados_demo, modelos, relogio, seguranca
 from gestor_campanhas.cli import budget as menu
 from gestor_campanhas.cli import campanhas as menu_campanhas
 from gestor_campanhas.cli import pedidos as menu_pedidos
@@ -431,3 +431,40 @@ def test_campanhas_do_cliente_explicam_como_pedir_outro_budget(teclado, ligacao,
     menu_campanhas.do_cliente(ligacao, contas[modelos.CLIENTE])
 
     assert 'Para pedir outro valor, use a opção "Pedidos de campanha".' in capsys.readouterr().out
+
+
+# --- dados de demonstração ---------------------------------------------------
+
+
+def test_dados_demo_criam_um_pedido_de_budget_pendente(ligacao):
+    dados_demo.criar_contas(ligacao)
+    dados_demo.criar_campanhas(ligacao)
+
+    criados = dados_demo.criar_pedidos_budget(ligacao)
+
+    assert criados == ["Reforçar os anúncios em vídeo na última semana antes do Natal"]
+    carla = utilizadores.obter_por_email(ligacao, "cliente@empresa.pt")
+    (pedido,) = servico.listar_do_cliente(ligacao, carla)
+    assert pedido.campanha_nome == "Natal 2026"
+    assert pedido.budget_atual_centimos == 150000
+    assert pedido.budget_pedido_centimos == 200000
+    assert pedido.estado == modelos.PENDENTE
+
+
+def test_dados_demo_nao_repetem_pedidos_de_budget(ligacao):
+    dados_demo.criar_contas(ligacao)
+    dados_demo.criar_campanhas(ligacao)
+    dados_demo.criar_pedidos_budget(ligacao)
+
+    assert dados_demo.criar_pedidos_budget(ligacao) == []
+
+
+def test_dados_demo_mostram_quantos_pedidos_de_budget_criaram(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv(config.VARIAVEL_PASTA_DADOS, str(tmp_path))
+
+    dados_demo.main()
+    dados_demo.main()
+
+    saida = capsys.readouterr().out
+    assert "Pedidos de alteração de budget criados: 1 (os restantes já existiam)." in saida
+    assert "Pedidos de alteração de budget criados: 0 (os restantes já existiam)." in saida
