@@ -14,17 +14,22 @@ rejeitar, indica o motivo.
 
 Cada campanha só pode ter um pedido de cada vez à espera de decisão, para
 não haver dois valores pedidos ao mesmo tempo para o mesmo budget.
+
+O módulo calcula também o resumo global do budget, para o Administrador: o
+budget atribuído, a despesa e o restante de cada cliente, e as campanhas que
+já gastaram mais do que o budget.
 """
 
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import dataclass
 
 from gestor_campanhas import dinheiro, modelos, relogio
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.modelos import Campanha, PedidoBudget, Utilizador
 from gestor_campanhas.repositorios import pedidos_budget
-from gestor_campanhas.servicos import campanhas
+from gestor_campanhas.servicos import campanhas, criativos
 
 #: Estados em que um pedido ainda espera pela decisão do Administrador.
 POR_DECIDIR = (modelos.PENDENTE, modelos.EM_ANALISE)
@@ -258,3 +263,121 @@ def rejeitar(ligacao: sqlite3.Connection, identificador: int, motivo: str) -> Pe
     if not motivo:
         raise ErroValidacao("O motivo da rejeição não pode ficar vazio.")
     return pedidos_budget.decidir(ligacao, pedido.id, modelos.REJEITADO, motivo)
+
+
+@dataclass
+class ResumoCliente:
+    """Contas do budget das campanhas de um cliente, para o resumo global.
+
+    :param cliente_id: Identificador do cliente.
+    :param cliente_nome: Nome do cliente.
+    :param campanhas: Número de campanhas do cliente.
+    :param budget_centimos: Soma dos budgets das campanhas que já têm budget.
+    :param despesa_centimos: Soma da despesa de todas as campanhas.
+    :param sem_budget: Número de campanhas que ainda não têm budget.
+    :param acima_do_budget: Número de campanhas cuja despesa passa o budget.
+    """
+
+    cliente_id: int
+    cliente_nome: str
+    campanhas: int = 0
+    budget_centimos: int = 0
+    despesa_centimos: int = 0
+    sem_budget: int = 0
+    acima_do_budget: int = 0
+
+    @property
+    def restante_centimos(self) -> int:
+        """Budget menos despesa, em cêntimos. Fica negativo quando a despesa passa o budget."""
+        return self.budget_centimos - self.despesa_centimos
+
+
+def acima_do_budget(campanha: Campanha, gasto: int) -> bool:
+    """Diz se uma campanha já gastou mais do que o budget.
+
+    :param campanha: Campanha a avaliar.
+    :param gasto: Despesa da campanha, em cêntimos.
+    :return: ``True`` se a campanha tem budget e a despesa é maior do que ele.
+        Uma campanha sem budget nunca está acima do budget.
+    """
+    return campanha.budget_centimos is not None and gasto > campanha.budget_centimos
+
+
+def campanhas_com_despesa(ligacao: sqlite3.Connection) -> list[tuple[Campanha, int]]:
+    """Lista todas as campanhas, cada uma com a sua despesa.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :return: Pares ``(campanha, despesa em cêntimos)``, ordenados pelo nome do
+        cliente e, dentro de cada cliente, pela ordem em que as campanhas
+        foram criadas.
+    """
+    despesas = criativos.despesas(ligacao)
+    todas = campanhas.listar_todas(ligacao)
+    ordenadas = sorted(todas, key=lambda campanha: (campanha.cliente_nome.casefold(), campanha.id))
+    return [(campanha, despesas.get(campanha.id, 0)) for campanha in ordenadas]
+
+
+def resumo_por_cliente(ligacao: sqlite3.Connection) -> list[ResumoCliente]:
+    """Calcula o budget atribuído, a despesa e o restante de cada cliente.
+
+    Só aparecem os clientes que têm campanhas. O budget é a soma dos budgets
+    das campanhas que já têm budget; a despesa é a soma da despesa de todas
+    as campanhas, mesmo as que ainda não têm budget.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :return: Um resumo por cliente, por ordem alfabética do nome.
+    """
+    resumos: dict[int, ResumoCliente] = {}
+    for campanha, gasto in campanhas_com_despesa(ligacao):
+        resumo = resumos.setdefault(campanha.cliente_id, ResumoCliente(campanha.cliente_id, campanha.cliente_nome))
+        resumo.campanhas += 1
+        resumo.despesa_centimos += gasto
+        if campanha.budget_centimos is None:
+            resumo.sem_budget += 1
+        else:
+            resumo.budget_centimos += campanha.budget_centimos
+        if acima_do_budget(campanha, gasto):
+            resumo.acima_do_budget += 1
+    return list(resumos.values())
+
+
+def somar(resumos: list[ResumoCliente]) -> ResumoCliente:
+    """Soma os resumos de vários clientes, para a linha do total.
+
+    :param resumos: Resumos a somar, como devolvidos por :func:`resumo_por_cliente`.
+    :return: Um resumo com os totais. O número e o nome do cliente ficam
+        ``0`` e ``"Total"``.
+    """
+    total = ResumoCliente(0, "Total")
+    for resumo in resumos:
+        total.campanhas += resumo.campanhas
+        total.budget_centimos += resumo.budget_centimos
+        total.despesa_centimos += resumo.despesa_centimos
+        total.sem_budget += resumo.sem_budget
+        total.acima_do_budget += resumo.acima_do_budget
+    return total
+
+
+def campanhas_acima_do_budget(ligacao: sqlite3.Connection) -> list[tuple[Campanha, int]]:
+    """Lista as campanhas que já gastaram mais do que o budget.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :return: Pares ``(campanha, despesa em cêntimos)``, pela mesma ordem de
+        :func:`campanhas_com_despesa`.
+    """
+    return [(campanha, gasto) for campanha, gasto in campanhas_com_despesa(ligacao) if acima_do_budget(campanha, gasto)]
+
+
+def campanhas_do_cliente(ligacao: sqlite3.Connection, cliente_id: int) -> list[tuple[Campanha, int]]:
+    """Lista as campanhas de um cliente, cada uma com a sua despesa, para o resumo global.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param cliente_id: Número do cliente, como aparece no resumo.
+    :return: Pares ``(campanha, despesa em cêntimos)``, pela ordem em que as
+        campanhas foram criadas.
+    :raises ErroValidacao: Se não houver nenhum cliente com campanhas com esse número.
+    """
+    lista = [(campanha, gasto) for campanha, gasto in campanhas_com_despesa(ligacao) if campanha.cliente_id == cliente_id]
+    if not lista:
+        raise ErroValidacao(f"Não há nenhum cliente com campanhas com o número {cliente_id}.")
+    return lista

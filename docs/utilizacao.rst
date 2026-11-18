@@ -380,6 +380,50 @@ Ficam registadas todas as alterações: o budget inicial de uma campanha criada
 a partir de um pedido de campanha, as feitas em **Definir budget** e as que
 resultam de um pedido de alteração de budget aprovado.
 
+Resumo do budget
+~~~~~~~~~~~~~~~~
+
+Dá a visão financeira de todas as campanhas. Mostra uma linha por cliente que
+tenha campanhas, por ordem alfabética, e os totais por baixo:
+
+.. code-block:: text
+
+   N.º  Cliente        Campanhas  Budget      Despesa     Restante  Sem budget  Acima do budget
+   ---  -------------  ---------  ----------  ----------  --------  ----------  ---------------
+   6    Beatriz Lopes  1          0,00 €      0,00 €      0,00 €    1           0
+   4    Carla Cliente  1          1 500,00 €  1 300,00 €  200,00 €  0           0
+   5    José Padeiro   1          800,00 €    300,00 €    500,00 €  0           0
+
+   Total: 3 campanhas, budget atribuído 2 300,00 €, despesa 1 600,00 €, restante 700,00 €.
+   O budget é a soma das campanhas que já têm budget; a despesa conta todas as campanhas.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Coluna
+     - O que mostra
+   * - Budget
+     - Soma dos budgets das campanhas do cliente que já têm budget.
+   * - Despesa
+     - Soma da despesa de todas as campanhas do cliente, mesmo as que ainda
+       não têm budget.
+   * - Restante
+     - Budget menos despesa. Fica negativo quando a despesa passa o budget.
+   * - Sem budget
+     - Quantas campanhas do cliente ainda não têm budget.
+   * - Acima do budget
+     - Quantas campanhas do cliente já gastaram mais do que o budget.
+
+Por baixo dos totais aparecem, em destaque, as campanhas acima do budget, com
+o budget, a despesa e quanto passaram. Se não houver nenhuma, aparece
+``Nenhuma campanha está acima do budget.``
+
+**Ver as campanhas de um cliente** pede o número do cliente (o da primeira
+coluna) e mostra as campanhas dele, uma por linha, com o budget, a despesa,
+o restante e a situação: ``Dentro do budget``, ``Acima do budget`` ou
+``Sem budget``.
+
 Horários de entrada e saída dos marketeers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
