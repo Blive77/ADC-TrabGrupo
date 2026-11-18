@@ -8,8 +8,10 @@ from gestor_campanhas import config, dados_demo, modelos, relogio, seguranca
 from gestor_campanhas.cli import budget as menu
 from gestor_campanhas.cli import campanhas as menu_campanhas
 from gestor_campanhas.cli import pedidos as menu_pedidos
+from gestor_campanhas.cli import perfis
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
+from gestor_campanhas.repositorios import criativos as criativos_bd
 from gestor_campanhas.repositorios import pedidos_budget as repositorio
 from gestor_campanhas.repositorios import utilizadores
 from gestor_campanhas.servicos import budget as servico
@@ -117,6 +119,35 @@ def test_repositorio_altera_o_estado(ligacao, natal):
 
     assert cancelado.estado == modelos.CANCELADO
     assert cancelado.nome_estado == "Cancelado"
+
+
+def test_repositorio_guarda_o_parecer_e_muda_o_estado(ligacao, natal):
+    pedido = repositorio.criar(ligacao, natal.id, 150000, 200000, "Mais anúncios")
+
+    com_parecer = repositorio.definir_parecer(ligacao, pedido.id, False, "Não há criativos para isso", modelos.EM_ANALISE)
+
+    assert com_parecer.parecer_viavel is False
+    assert com_parecer.nome_parecer == "Não viável"
+    assert com_parecer.parecer_justificacao == "Não há criativos para isso"
+    assert com_parecer.estado == modelos.EM_ANALISE
+
+    outro = repositorio.definir_parecer(ligacao, pedido.id, True, "Afinal há", modelos.EM_ANALISE)
+
+    assert outro.parecer_viavel is True
+    assert outro.parecer_justificacao == "Afinal há"
+
+
+def test_repositorio_lista_os_pedidos_das_campanhas_do_marketeer(ligacao, contas, natal):
+    marta = utilizadores.criar(
+        ligacao, "Marta Marques", "marta@agencia.pt", seguranca.gerar_hash(PASSWORD_TESTE), modelos.MARKETEER
+    )
+    da_marta = campanhas_bd.criar(ligacao, "Primavera", "", contas[modelos.CLIENTE].id, marta.id)
+    primeiro = repositorio.criar(ligacao, natal.id, 150000, 200000, "Primeiro")
+    outro = repositorio.criar(ligacao, da_marta.id, None, 50000, "Da Marta")
+    segundo = repositorio.criar(ligacao, natal.id, 150000, 100000, "Segundo")
+
+    assert repositorio.listar_por_marketeer(ligacao, contas[modelos.MARKETEER].id) == [primeiro, segundo]
+    assert repositorio.listar_por_marketeer(ligacao, marta.id) == [outro]
 
 
 @pytest.mark.parametrize(("viavel", "nome"), [(True, "Viável"), (False, "Não viável"), (None, "Por dar")])
@@ -264,6 +295,174 @@ def test_cliente_nao_cancela_pedidos_de_outro(ligacao, pedido, jose):
         servico.cancelar(ligacao, jose, pedido.id)
 
     assert repositorio.obter_por_id(ligacao, pedido.id).estado == modelos.PENDENTE
+
+
+# --- parecer do marketeer ----------------------------------------------------
+
+
+@pytest.fixture
+def marta(ligacao):
+    """Uma segunda marketeer, sem campanhas."""
+    return utilizadores.criar(
+        ligacao, "Marta Marques", "marta@agencia.pt", seguranca.gerar_hash(PASSWORD_TESTE), modelos.MARKETEER
+    )
+
+
+def test_marketeer_da_parecer_e_o_pedido_fica_em_analise(ligacao, contas, pedido):
+    miguel = contas[modelos.MARKETEER]
+
+    com_parecer = servico.dar_parecer(ligacao, miguel, pedido.id, True, "  Há margem para mais vídeo ")
+
+    assert com_parecer.parecer_viavel is True
+    assert com_parecer.parecer_justificacao == "Há margem para mais vídeo"
+    assert com_parecer.estado == modelos.EM_ANALISE
+
+
+def test_marketeer_pode_mudar_o_parecer_antes_da_decisao(ligacao, contas, pedido):
+    miguel = contas[modelos.MARKETEER]
+    servico.dar_parecer(ligacao, miguel, pedido.id, True, "Há margem")
+
+    novo = servico.dar_parecer(ligacao, miguel, pedido.id, False, "Afinal os criativos não ficam prontos")
+
+    assert novo.parecer_viavel is False
+    assert novo.parecer_justificacao == "Afinal os criativos não ficam prontos"
+    assert novo.estado == modelos.EM_ANALISE
+
+
+def test_depois_do_parecer_o_cliente_ja_nao_cancela(ligacao, contas, pedido):
+    servico.dar_parecer(ligacao, contas[modelos.MARKETEER], pedido.id, True, "Há margem")
+
+    with pytest.raises(ErroValidacao, match="Este pedido está no estado Em análise"):
+        servico.cancelar(ligacao, contas[modelos.CLIENTE], pedido.id)
+
+
+def test_parecer_sem_justificacao_nao_e_guardado(ligacao, contas, pedido):
+    with pytest.raises(ErroValidacao, match="A justificação do parecer não pode ficar vazia"):
+        servico.dar_parecer(ligacao, contas[modelos.MARKETEER], pedido.id, True, "   ")
+
+    assert repositorio.obter_por_id(ligacao, pedido.id).parecer_viavel is None
+
+
+@pytest.mark.parametrize("estado", [modelos.APROVADO, modelos.REJEITADO, modelos.CANCELADO])
+def test_pedido_decidido_ou_cancelado_nao_aceita_parecer(ligacao, contas, pedido, estado):
+    repositorio.definir_estado(ligacao, pedido.id, estado)
+
+    with pytest.raises(ErroValidacao, match="Este pedido já não aceita parecer"):
+        servico.dar_parecer(ligacao, contas[modelos.MARKETEER], pedido.id, True, "Há margem")
+
+
+def test_marketeer_so_da_parecer_nas_suas_campanhas(ligacao, pedido, marta):
+    with pytest.raises(ErroValidacao, match=f"Não há nenhum pedido de budget com o número {pedido.id} nas suas campanhas"):
+        servico.dar_parecer(ligacao, marta, pedido.id, True, "Há margem")
+
+    assert repositorio.obter_por_id(ligacao, pedido.id).parecer_viavel is None
+
+
+def test_marketeer_novo_da_campanha_passa_a_ver_o_pedido(ligacao, contas, pedido, natal, marta):
+    campanhas_bd.definir_marketeer(ligacao, natal.id, marta.id)
+
+    assert servico.listar_do_marketeer(ligacao, marta) == [repositorio.obter_por_id(ligacao, pedido.id)]
+    assert servico.listar_do_marketeer(ligacao, contas[modelos.MARKETEER]) == []
+
+
+def test_lista_do_marketeer_mostra_primeiro_os_por_decidir(ligacao, contas, natal, padaria):
+    miguel = contas[modelos.MARKETEER]
+    antigo = repositorio.criar(ligacao, natal.id, 150000, 200000, "Antigo")
+    repositorio.definir_estado(ligacao, antigo.id, modelos.CANCELADO)
+    do_jose = repositorio.criar(ligacao, padaria.id, None, 50000, "Do José")
+    novo = repositorio.criar(ligacao, natal.id, 150000, 180000, "Novo")
+
+    assert [p.id for p in servico.listar_do_marketeer(ligacao, miguel)] == [do_jose.id, novo.id, antigo.id]
+
+
+# --- menu do marketeer -------------------------------------------------------
+
+
+def test_opcao_pedidos_de_budget_esta_no_menu_do_marketeer():
+    opcoes = perfis.OPCOES[modelos.MARKETEER]
+
+    assert [descricao for descricao, _ in opcoes][:3] == ["Campanhas", "Criativos", "Pedidos de budget"]
+    assert dict(opcoes)["Pedidos de budget"] is menu.do_marketeer
+
+
+def test_menu_do_marketeer_sem_pedidos(teclado, ligacao, marta, capsys):
+    teclado("0")
+
+    menu.do_marketeer(ligacao, marta)
+
+    saida = capsys.readouterr().out
+    assert "Pedidos de alteração de budget das minhas campanhas" in saida
+    assert "Ainda não há pedidos de alteração de budget nas suas campanhas." in saida
+    assert "1. Dar parecer" in saida
+
+
+def test_menu_do_marketeer_mostra_os_pedidos_das_suas_campanhas(teclado, ligacao, contas, pedido, capsys):
+    teclado("0")
+
+    menu.do_marketeer(ligacao, contas[modelos.MARKETEER])
+
+    saida = capsys.readouterr().out
+    assert "N.º  Feito em    Campanha    Cliente        De          Para        Estado    Parecer" in saida
+    assert f"{pedido.id}    2026-11-18  Natal 2026  Carla Cliente  1 500,00 €  2 000,00 €  Pendente  Por dar" in saida
+    assert "1 pedido, 1 por decidir." in saida
+
+
+def test_menu_do_marketeer_guarda_o_parecer(teclado, ligacao, contas, pedido, capsys):
+    teclado("1", str(pedido.id), "s", "Há margem para mais vídeo", "", "0")
+
+    menu.do_marketeer(ligacao, contas[modelos.MARKETEER])
+
+    saida = capsys.readouterr().out
+    assert "  Cliente:      Carla Cliente" in saida
+    assert "  Parecer:      Por dar" in saida
+    assert "Despesa atual da campanha: 0,00 €." in saida
+    assert "Parecer guardado. O pedido fica em análise, à espera da decisão do administrador." in saida
+    assert f"{pedido.id}    2026-11-18  Natal 2026  Carla Cliente  1 500,00 €  2 000,00 €  Em análise  Viável" in saida
+    guardado = repositorio.obter_por_id(ligacao, pedido.id)
+    assert guardado.parecer_viavel is True
+    assert guardado.parecer_justificacao == "Há margem para mais vídeo"
+
+
+def test_menu_do_marketeer_mostra_a_despesa_da_campanha(teclado, ligacao, contas, pedido, natal, capsys):
+    criativos_bd.criar(ligacao, natal.id, "Banner", "", 40000, None, "", "")
+    teclado(str(pedido.id), "n", "Não há criativos para isso", "")
+
+    menu.dar_parecer(ligacao, contas[modelos.MARKETEER])
+
+    assert "Despesa atual da campanha: 400,00 €." in capsys.readouterr().out
+    assert repositorio.obter_por_id(ligacao, pedido.id).parecer_viavel is False
+
+
+def test_menu_avisa_que_o_parecer_novo_substitui_o_anterior(teclado, ligacao, contas, pedido, capsys):
+    servico.dar_parecer(ligacao, contas[modelos.MARKETEER], pedido.id, True, "Há margem")
+    teclado(str(pedido.id), "n", "Mudei de ideias", "")
+
+    menu.dar_parecer(ligacao, contas[modelos.MARKETEER])
+
+    saida = capsys.readouterr().out
+    assert "  Parecer:      Viável" in saida
+    assert "  Justificação: Há margem" in saida
+    assert "Já deu parecer sobre este pedido. O parecer novo substitui o anterior." in saida
+    assert repositorio.obter_por_id(ligacao, pedido.id).parecer_justificacao == "Mudei de ideias"
+
+
+def test_menu_nao_pede_parecer_a_um_pedido_decidido(teclado, ligacao, contas, pedido, capsys):
+    repositorio.definir_estado(ligacao, pedido.id, modelos.CANCELADO)
+    teclado(str(pedido.id), "")
+
+    menu.dar_parecer(ligacao, contas[modelos.MARKETEER])
+
+    saida = capsys.readouterr().out
+    assert "Este pedido já não aceita parecer." in saida
+    assert "O pedido é viável?" not in saida
+
+
+def test_menu_nao_mostra_pedidos_de_outro_marketeer(teclado, ligacao, pedido, marta, capsys):
+    teclado(str(pedido.id), "")
+
+    menu.dar_parecer(ligacao, marta)
+
+    assert f"Não há nenhum pedido de budget com o número {pedido.id} nas suas campanhas." in capsys.readouterr().out
 
 
 # --- menu do cliente ---------------------------------------------------------

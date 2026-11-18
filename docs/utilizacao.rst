@@ -613,6 +613,46 @@ Pede o número do criativo e mostra o nome, o tipo e o tamanho do ficheiro:
 Com ``s``, o ficheiro abre-se no programa que o sistema usa para esse tipo
 de ficheiro (por exemplo, o browser para um ``.svg``).
 
+Pedidos de budget
+~~~~~~~~~~~~~~~~~
+
+Mostra os pedidos de alteração de budget feitos pelos clientes para as
+campanhas de que o marketeer é responsável. Os que estão por decidir
+(``Pendente`` e ``Em análise``) aparecem primeiro.
+
+.. code-block:: text
+
+   N.º  Feito em    Campanha    Cliente        De          Para        Estado    Parecer
+   ---  ----------  ----------  -------------  ----------  ----------  --------  -------
+   1    2026-11-18  Natal 2026  Carla Cliente  1 500,00 €  2 000,00 €  Pendente  Por dar
+
+   1 pedido, 1 por decidir.
+
+As colunas ``De`` e ``Para`` mostram o budget da campanha quando o pedido
+foi feito e o budget pedido. Se a campanha passar para outro marketeer, os
+pedidos dela passam a aparecer na lista do marketeer novo.
+
+**Dar parecer** pede o número do pedido e mostra os dados dele, com o motivo
+do cliente e a despesa atual da campanha, para se comparar com o valor
+pedido. Depois pergunta:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Pergunta
+     - Resposta
+   * - O pedido é viável?
+     - ``s`` ou ``n``.
+   * - Justificação
+     - Obrigatória. Explica ao Administrador porque é que o pedido é, ou não
+       é, viável.
+
+Com o parecer, o pedido passa a ``Em análise`` e o cliente deixa de o poder
+cancelar. Enquanto o Administrador não o decidir, o marketeer pode dar outro
+parecer: o novo substitui o anterior. Um pedido aprovado, rejeitado ou
+cancelado já não aceita parecer.
+
 Cliente
 -------
 
@@ -726,9 +766,10 @@ terminaram, com o budget de cada uma, e pede:
 Uma campanha que ainda não tem budget também aceita pedidos: nesse caso o
 budget atual aparece como ``Por definir``.
 
-O pedido fica ``Pendente`` até o marketeer responsável dar o parecer e o
-Administrador o decidir. Se algum valor não respeitar as regras, o pedido não
-é registado.
+O pedido fica ``Pendente`` até o marketeer responsável dar o parecer. Com o
+parecer, passa a ``Em análise`` e fica à espera da decisão do Administrador;
+a partir daí já não pode ser cancelado. Se algum valor não respeitar as
+regras, o pedido não é registado.
 
 Na lista, as colunas ``De`` e ``Para`` mostram o budget que a campanha tinha
 quando o pedido foi feito e o budget pedido:
