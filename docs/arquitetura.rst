@@ -199,6 +199,35 @@ ficheiro de texto da pasta ``caixa_saida``, dentro da pasta de dados. O resto
 da aplicação chama essa função como se o email fosse mesmo enviado, por isso
 trocar a simulação por um envio a sério só obriga a alterar esse módulo.
 
+Notificações
+------------
+
+Todas as notificações passam por
+:func:`gestor_campanhas.servicos.notificacoes.notificar`, que faz duas
+coisas: guarda a notificação na tabela ``notificacoes`` e envia o mesmo
+texto por email. O email acaba com uma linha a dizer onde está o item no
+menu de quem o recebe, tirada do dicionário
+:data:`gestor_campanhas.servicos.notificacoes.ONDE`.
+
+Quem decide quem é notificado são as regras de cada assunto, no fim de cada
+operação que corre bem: :mod:`gestor_campanhas.servicos.campanhas` (campanha
+atribuída), :mod:`gestor_campanhas.servicos.budget` (pedido novo e
+decisão), :mod:`gestor_campanhas.servicos.criativos` (criativo criado,
+alterado, eliminado, mudança de estado e ficheiro) e
+:mod:`gestor_campanhas.servicos.comentarios` (comentário e resposta). Como a
+notificação é a última coisa a acontecer, uma operação recusada por uma
+regra não notifica ninguém.
+
+Cada notificação guarda o tipo do item (coluna ``sobre``: ``campanha``,
+``pedido_budget`` ou ``criativo``) e o número dele (``item_id``). A coluna
+``item_id`` não é uma chave estrangeira, porque aponta para tabelas
+diferentes conforme o tipo. Ao abrir a notificação,
+:func:`gestor_campanhas.cli.notificacoes.mostrar_item` procura o item com as
+mesmas funções que os menus usam (por exemplo
+:func:`gestor_campanhas.servicos.criativos.obter_do_cliente`), por isso um
+utilizador nunca vê, por uma notificação antiga, um item a que já não tem
+acesso.
+
 Base de dados
 -------------
 
@@ -256,6 +285,10 @@ executadas em todos os arranques sem apagar dados.
      - Uma linha por comentário ou resposta: criativo, autor, texto, data e,
        numa resposta, o número do comentário a que responde
        (``resposta_a``).
+   * - ``notificacoes``
+     - Uma linha por notificação: quem a recebe, o texto, o tipo do item
+       (``campanha``, ``pedido_budget`` ou ``criativo``), o número do item, se
+       já foi lida e a data.
 
 Uma campanha com criativos não pode ser apagada: a coluna ``campanha_id`` da
 tabela ``criativos`` aponta para ela, e o SQLite recusa apagar uma linha a

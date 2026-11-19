@@ -15,6 +15,10 @@ rejeitar, indica o motivo.
 Cada campanha só pode ter um pedido de cada vez à espera de decisão, para
 não haver dois valores pedidos ao mesmo tempo para o mesmo budget.
 
+O marketeer recebe uma notificação quando há um pedido novo numa campanha
+dele, e o cliente recebe outra quando o pedido é aprovado ou rejeitado (ver
+:mod:`gestor_campanhas.servicos.notificacoes`).
+
 O módulo calcula também o resumo global do budget, para o Administrador: o
 budget atribuído, a despesa e o restante de cada cliente, e as campanhas que
 já gastaram mais do que o budget.
@@ -28,11 +32,17 @@ from dataclasses import dataclass
 from gestor_campanhas import dinheiro, modelos, relogio
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.modelos import Campanha, PedidoBudget, Utilizador
-from gestor_campanhas.repositorios import pedidos_budget
-from gestor_campanhas.servicos import campanhas, criativos
+from gestor_campanhas.repositorios import pedidos_budget, utilizadores
+from gestor_campanhas.servicos import campanhas, criativos, notificacoes
+
 
 #: Estados em que um pedido ainda espera pela decisão do Administrador.
 POR_DECIDIR = (modelos.PENDENTE, modelos.EM_ANALISE)
+
+
+def _valor(centimos: int | None) -> str:
+    """Escreve um budget em euros, ou ``"Por definir"`` se não houver."""
+    return "Por definir" if centimos is None else dinheiro.formatar(centimos)
 
 
 def campanha_para_pedido(ligacao: sqlite3.Connection, cliente: Utilizador, campanha_id: int) -> Campanha:
@@ -65,7 +75,8 @@ def pedir(
     """Regista um pedido de alteração do budget de uma campanha do cliente.
 
     O pedido guarda o budget que a campanha tem neste momento, para se poder
-    comparar com o valor pedido mesmo depois de o budget mudar.
+    comparar com o valor pedido mesmo depois de o budget mudar. O marketeer
+    responsável pela campanha é notificado.
 
     :param ligacao: Ligação aberta à base de dados.
     :param cliente: Cliente que está a fazer o pedido.
@@ -87,7 +98,17 @@ def pedir(
     motivo = motivo.strip()
     if not motivo:
         raise ErroValidacao("O motivo não pode ficar vazio.")
-    return pedidos_budget.criar(ligacao, campanha.id, campanha.budget_centimos, centimos, motivo)
+    pedido = pedidos_budget.criar(ligacao, campanha.id, campanha.budget_centimos, centimos, motivo)
+    notificacoes.notificar(
+        ligacao,
+        campanhas.responsavel(ligacao, campanha),
+        "Novo pedido de alteração de budget",
+        f"{cliente.nome} pediu para alterar o budget da campanha {campanha.nome} de "
+        f"{_valor(campanha.budget_centimos)} para {_valor(centimos)} (pedido n.º {pedido.id}).",
+        modelos.SOBRE_PEDIDO_BUDGET,
+        pedido.id,
+    )
+    return pedido
 
 
 def listar_do_cliente(ligacao: sqlite3.Connection, cliente: Utilizador) -> list[PedidoBudget]:
@@ -227,7 +248,8 @@ def aprovar(ligacao: sqlite3.Connection, identificador: int) -> PedidoBudget:
     """Aprova um pedido de alteração de budget e altera o budget da campanha.
 
     O budget da campanha passa a ser o valor pedido. A alteração fica no
-    histórico do budget, com o número e o motivo do pedido.
+    histórico do budget, com o número e o motivo do pedido. O cliente é
+    notificado, com o budget novo.
 
     :param ligacao: Ligação aberta à base de dados.
     :param identificador: Número do pedido.
@@ -245,11 +267,27 @@ def aprovar(ligacao: sqlite3.Connection, identificador: int) -> PedidoBudget:
         )
     motivo = f"Pedido de budget n.º {pedido.id}: {pedido.motivo}"
     campanhas.alterar_budget(ligacao, campanha, pedido.budget_pedido_centimos, motivo, pedido.id)
-    return pedidos_budget.decidir(ligacao, pedido.id, modelos.APROVADO)
+    pedido = pedidos_budget.decidir(ligacao, pedido.id, modelos.APROVADO)
+    _avisar_cliente(
+        ligacao,
+        pedido,
+        "O seu pedido de budget foi aprovado",
+        f"O seu pedido de budget n.º {pedido.id} foi aprovado. "
+        f"O budget da campanha {pedido.campanha_nome} passou a {_valor(pedido.budget_pedido_centimos)}.",
+    )
+    return pedido
+
+
+def _avisar_cliente(ligacao: sqlite3.Connection, pedido: PedidoBudget, assunto: str, texto: str) -> None:
+    """Notifica o cliente de um pedido de alteração de budget."""
+    cliente = utilizadores.obter_por_id(ligacao, pedido.cliente_id)
+    notificacoes.notificar(ligacao, cliente, assunto, texto, modelos.SOBRE_PEDIDO_BUDGET, pedido.id)
 
 
 def rejeitar(ligacao: sqlite3.Connection, identificador: int, motivo: str) -> PedidoBudget:
     """Rejeita um pedido de alteração de budget, indicando o motivo. O budget não muda.
+
+    O cliente é notificado, com o motivo.
 
     :param ligacao: Ligação aberta à base de dados.
     :param identificador: Número do pedido.
@@ -262,7 +300,15 @@ def rejeitar(ligacao: sqlite3.Connection, identificador: int, motivo: str) -> Pe
     motivo = motivo.strip()
     if not motivo:
         raise ErroValidacao("O motivo da rejeição não pode ficar vazio.")
-    return pedidos_budget.decidir(ligacao, pedido.id, modelos.REJEITADO, motivo)
+    pedido = pedidos_budget.decidir(ligacao, pedido.id, modelos.REJEITADO, motivo)
+    _avisar_cliente(
+        ligacao,
+        pedido,
+        "O seu pedido de budget foi rejeitado",
+        f"O seu pedido de budget n.º {pedido.id}, para a campanha {pedido.campanha_nome}, foi rejeitado. "
+        f"Motivo: {motivo}",
+    )
+    return pedido
 
 
 @dataclass

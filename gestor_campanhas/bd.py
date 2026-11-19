@@ -131,6 +131,16 @@ CREATE TABLE IF NOT EXISTS comentarios (
     resposta_a INTEGER REFERENCES comentarios (id) ON DELETE CASCADE,
     criado_em TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS notificacoes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    utilizador_id INTEGER NOT NULL REFERENCES utilizadores (id),
+    texto TEXT NOT NULL,
+    sobre TEXT NOT NULL CHECK (sobre IN ('campanha', 'pedido_budget', 'criativo')),
+    item_id INTEGER NOT NULL,
+    lida INTEGER NOT NULL DEFAULT 0,
+    criada_em TEXT NOT NULL
+);
 """
 
 

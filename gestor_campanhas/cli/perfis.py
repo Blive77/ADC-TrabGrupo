@@ -1,7 +1,8 @@
 """Menu de cada perfil, mostrado depois de o utilizador entrar.
 
 Os três perfis usam o mesmo ciclo de menu. O que muda de perfil para perfil
-é a lista de opções, definida em :data:`OPCOES`.
+é a lista de opções, definida em :data:`OPCOES`. Antes de cada menu aparece
+quantas notificações o utilizador tem por ler, se tiver alguma.
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 from gestor_campanhas import modelos
-from gestor_campanhas.cli import admin, budget, campanhas, comum, conta, criativos, gestao, pedidos
+from gestor_campanhas.cli import admin, budget, campanhas, comum, conta, criativos, gestao, notificacoes, pedidos
 from gestor_campanhas.servicos import sessoes
 from gestor_campanhas.servicos.sessoes import SessaoAtiva
 
@@ -37,12 +38,14 @@ OPCOES: dict[str, list] = {
         ("Campanhas", campanhas.do_marketeer),
         ("Criativos", criativos.do_marketeer),
         ("Pedidos de budget", budget.do_marketeer),
+        ("Notificações", notificacoes.do_utilizador),
         *OPCOES_DA_CONTA,
     ],
     modelos.CLIENTE: [
         ("Pedidos de campanha", pedidos.do_cliente),
         ("Campanhas", campanhas.do_cliente),
         ("Criativos", criativos.do_cliente),
+        ("Notificações", notificacoes.do_utilizador),
         *OPCOES_DA_CONTA,
     ],
 }
@@ -63,6 +66,7 @@ def executar(ligacao: sqlite3.Connection, sessao: SessaoAtiva) -> None:
     menu = [(str(numero), descricao) for numero, (descricao, _) in enumerate(opcoes, start=1)]
     menu.append(("0", "Terminar sessão"))
     while True:
+        notificacoes.avisar_se_houver_por_ler(ligacao, utilizador)
         escolha = comum.escolher_opcao(f"{utilizador.nome_perfil} — {utilizador.nome}", menu)
         if sessao.expirou():
             sessoes.terminar(ligacao, sessao, modelos.INATIVIDADE)

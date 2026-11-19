@@ -266,3 +266,30 @@ def test_apagar_um_criativo_apaga_os_comentarios_e_as_respostas(ligacao, contas)
     ligacao.execute("DELETE FROM criativos WHERE id = ?", (criativo_id,))
 
     assert ligacao.execute("SELECT COUNT(*) FROM comentarios").fetchone()[0] == 0
+
+
+def test_notificacao_comeca_por_ler(ligacao, contas):
+    ligacao.execute(
+        "INSERT INTO notificacoes (utilizador_id, texto, sobre, item_id, criada_em) "
+        "VALUES (?, 'Novo criativo', 'criativo', 1, '2026-11-19 10:00:00')",
+        (contas["cliente"].id,),
+    )
+
+    assert ligacao.execute("SELECT lida FROM notificacoes").fetchone()[0] == 0
+
+
+def test_notificacao_tem_de_ter_um_utilizador_que_existe(ligacao):
+    with pytest.raises(sqlite3.IntegrityError):
+        ligacao.execute(
+            "INSERT INTO notificacoes (utilizador_id, texto, sobre, item_id, criada_em) "
+            "VALUES (999, 'Novo criativo', 'criativo', 1, '2026-11-19 10:00:00')"
+        )
+
+
+def test_notificacao_so_aceita_os_assuntos_previstos(ligacao, contas):
+    with pytest.raises(sqlite3.IntegrityError):
+        ligacao.execute(
+            "INSERT INTO notificacoes (utilizador_id, texto, sobre, item_id, criada_em) "
+            "VALUES (?, 'Olá', 'outra_coisa', 1, '2026-11-19 10:00:00')",
+            (contas["cliente"].id,),
+        )
