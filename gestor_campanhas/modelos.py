@@ -327,3 +327,33 @@ class AlteracaoBudget:
     motivo: str
     alterado_em: datetime
     pedido_budget_id: int | None = None
+
+
+@dataclass
+class Comentario:
+    """Um comentário sobre um criativo, ou a resposta a um comentário.
+
+    O cliente comenta os criativos das suas campanhas; o marketeer responde
+    a cada comentário. Uma resposta é um comentário que indica, em
+    ``resposta_a``, o comentário a que responde.
+
+    :param id: Identificador na base de dados.
+    :param criativo_id: Identificador do criativo comentado.
+    :param autor_id: Identificador de quem escreveu.
+    :param texto: O que foi escrito.
+    :param criado_em: Data e hora em que foi escrito.
+    :param resposta_a: Identificador do comentário a que esta resposta
+        responde, ou ``None`` se for um comentário do cliente.
+    :param autor_nome: Nome de quem escreveu, para mostrar no ecrã.
+    :param autor_perfil: Perfil de quem escreveu (:data:`CLIENTE` ou
+        :data:`MARKETEER`).
+    """
+
+    id: int
+    criativo_id: int
+    autor_id: int
+    texto: str
+    criado_em: datetime
+    resposta_a: int | None = None
+    autor_nome: str = ""
+    autor_perfil: str = ""
