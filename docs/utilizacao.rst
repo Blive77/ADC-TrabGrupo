@@ -48,8 +48,10 @@ pendentes, um do cliente ``jose@padaria.pt`` e outro da cliente
 primavera``) e um pedido de alteração de budget pendente, da cliente
 ``cliente@empresa.pt``, para passar o budget da campanha ``Natal 2026`` de
 1500 € para 2000 €. O budget das campanhas ``Natal 2026`` e ``Regresso às
-aulas`` fica registado no histórico do budget como ``Budget inicial``. O
-comando pode ser repetido: só acrescenta o que faltar.
+aulas`` fica registado no histórico do budget como ``Budget inicial``. Há
+ainda um comentário da cliente ``cliente@empresa.pt`` ao criativo
+``Vídeo da montra``, por responder. O comando pode ser repetido: só
+acrescenta o que faltar.
 
 Entrar e sair
 -------------
@@ -644,7 +646,9 @@ Ver criativo
 ^^^^^^^^^^^^
 
 Pede o número do criativo e mostra todos os dados dele, um por linha,
-incluindo a descrição e o público-alvo completo.
+incluindo a descrição e o público-alvo completo. Por baixo aparecem os
+comentários do cliente, cada um com as respostas (ver
+`Responder a comentário`_).
 
 Eliminar criativo
 ^^^^^^^^^^^^^^^^^
@@ -717,6 +721,29 @@ Pede o número do criativo e mostra o nome, o tipo e o tamanho do ficheiro:
 
 Com ``s``, o ficheiro abre-se no programa que o sistema usa para esse tipo
 de ficheiro (por exemplo, o browser para um ``.svg``).
+
+Responder a comentário
+^^^^^^^^^^^^^^^^^^^^^^
+
+O cliente comenta os criativos para dizer o que quer que mude. Quando há
+comentários sem resposta, a lista dos criativos diz quantos são e em que
+criativos, por exemplo
+``Há 1 comentário do cliente por responder (criativo n.º 2).``
+
+Esta opção pede o número do criativo e mostra os comentários dele:
+
+.. code-block:: text
+
+   Comentários
+     N.º 1, de Carla Cliente, em 2026-11-19 10:00:
+       Gostava que o vídeo mostrasse a montra à noite, com as luzes acesas.
+       (ainda sem resposta)
+
+Depois pede o número do comentário a que se responde e a resposta. A
+resposta aparece por baixo do comentário, com o nome de quem respondeu e a
+data. Um comentário pode ter mais do que uma resposta. Só se responde a
+comentários do cliente: o número de uma resposta não é aceite. Com Enter, em
+qualquer das perguntas, nada é guardado.
 
 Pedidos de budget
 ~~~~~~~~~~~~~~~~~
@@ -995,7 +1022,8 @@ Os criativos que respeitam todos os filtros aparecem com o título
 completa.
 
 **Ver criativo** pede o número do criativo e mostra todos os dados dele,
-incluindo a descrição e o público-alvo completo.
+incluindo a descrição e o público-alvo completo, e os comentários, com as
+respostas do marketeer.
 
 Por baixo da lista aparece quantos criativos estão à espera de aprovação,
 por exemplo ``Há 1 criativo à espera da sua aprovação.``
@@ -1025,3 +1053,9 @@ Com Enter, a cópia vai para a pasta ``Downloads`` (Transferências) da pasta
 pessoal. Se já houver um ficheiro com o mesmo nome, a cópia fica com um
 número entre parênteses, por exemplo ``banner-natal (1).svg``: nenhum
 ficheiro é apagado.
+
+**Comentar criativo** pede o número do criativo, mostra os comentários que
+ele já tem e pede o comentário ou a sugestão. O comentário fica com a data e
+o nome de quem o escreveu, e o marketeer vê-o no detalhe do criativo. Pode
+comentar-se um criativo em qualquer estado. Para responder a uma resposta do
+marketeer, escreve-se um comentário novo. Com Enter, nada é guardado.

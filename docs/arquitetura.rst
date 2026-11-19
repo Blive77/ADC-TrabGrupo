@@ -252,6 +252,10 @@ executadas em todos os arranques sem apagar dados.
      - O histórico do budget: uma linha por alteração, com a campanha, o
        budget anterior (vazio se não havia), o budget novo, o motivo, a data
        e, quando a alteração vem de um pedido aprovado, o número do pedido.
+   * - ``comentarios``
+     - Uma linha por comentário ou resposta: criativo, autor, texto, data e,
+       numa resposta, o número do comentário a que responde
+       (``resposta_a``).
 
 Uma campanha com criativos não pode ser apagada: a coluna ``campanha_id`` da
 tabela ``criativos`` aponta para ela, e o SQLite recusa apagar uma linha a
@@ -263,7 +267,9 @@ Os pedidos de alteração de budget e o histórico do budget, pelo contrário,
 não impedem que a campanha seja apagada. A coluna ``campanha_id`` das tabelas
 ``pedidos_budget`` e ``alteracoes_budget`` tem ``ON DELETE CASCADE``: quando
 a campanha é apagada, os pedidos e o histórico dela são apagados com ela,
-porque não fazem sentido sem a campanha.
+porque não fazem sentido sem a campanha. O mesmo acontece aos comentários de
+um criativo: a coluna ``criativo_id`` da tabela ``comentarios`` também tem
+``ON DELETE CASCADE``.
 
 Estados de um criativo
 ----------------------
@@ -388,3 +394,21 @@ sobre essa lista:
 A regra "acima do budget" está num só sítio,
 :func:`gestor_campanhas.servicos.budget.acima_do_budget`: uma campanha sem
 budget nunca está acima do budget.
+
+Comentários dos criativos
+-------------------------
+
+Os comentários do cliente e as respostas do marketeer ficam na mesma tabela,
+``comentarios``. Uma resposta é um comentário com a coluna ``resposta_a``
+preenchida. Assim, uma só consulta traz a conversa toda de um criativo, pela
+ordem em que foi escrita.
+
+:func:`gestor_campanhas.servicos.comentarios.conversa` arruma essa lista em
+pares ``(comentário, respostas)``, que é a forma como os menus a mostram.
+Responde-se a um comentário do cliente, e não a uma resposta: para continuar
+a conversa, o cliente escreve um comentário novo. Por isso a conversa tem só
+dois níveis.
+
+Os comentários por responder também não são guardados: são os comentários do
+cliente que não têm nenhuma resposta, contados por
+:func:`gestor_campanhas.servicos.comentarios.por_responder`.
