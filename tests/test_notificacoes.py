@@ -5,10 +5,12 @@ from datetime import date, datetime
 import pytest
 
 from gestor_campanhas import modelos, relogio, seguranca
+from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
 from gestor_campanhas.repositorios import criativos as criativos_bd
 from gestor_campanhas.repositorios import notificacoes as repositorio
 from gestor_campanhas.repositorios import utilizadores
+from gestor_campanhas.servicos import notificacoes as servico
 from tests.conftest import PASSWORD_TESTE
 
 
@@ -104,3 +106,74 @@ def test_repositorio_conta_e_marca_as_notificacoes_por_ler(ligacao, cliente, mar
     assert repositorio.marcar_todas_como_lidas(ligacao, cliente.id) == 2
     assert repositorio.contar_por_ler(ligacao, cliente.id) == 0
     assert repositorio.contar_por_ler(ligacao, marketeer.id) == 1
+
+
+# --- regras ------------------------------------------------------------------
+
+
+def test_notificar_guarda_a_notificacao_e_envia_um_email(ligacao, cliente, emails):
+    notificacao = servico.notificar(
+        ligacao, cliente, "Novo criativo", "Foi criado o criativo Banner de Natal.", modelos.SOBRE_CRIATIVO, 3
+    )
+
+    assert servico.listar(ligacao, cliente) == [notificacao]
+    (email,) = emails()
+    assert "Para: carla@empresa.pt" in email
+    assert "Assunto: Novo criativo" in email
+    assert (
+        "Olá, Carla Cliente.\n\nFoi criado o criativo Banner de Natal.\n"
+        'Pode consultá-lo na opção "Criativos" do seu menu.\n'
+    ) in email
+
+
+@pytest.mark.parametrize(
+    ("sobre", "perfil", "onde"),
+    [
+        (modelos.SOBRE_CAMPANHA, modelos.MARKETEER, '"Campanhas"'),
+        (modelos.SOBRE_PEDIDO_BUDGET, modelos.MARKETEER, 'Pode dar o parecer na opção "Pedidos de budget"'),
+        (modelos.SOBRE_PEDIDO_BUDGET, modelos.CLIENTE, '"Pedidos de campanha"'),
+        (modelos.SOBRE_CRIATIVO, modelos.MARKETEER, '"Criativos"'),
+    ],
+)
+def test_email_diz_onde_encontrar_o_item(ligacao, contas, emails, sobre, perfil, onde):
+    servico.notificar(ligacao, contas[perfil], "Aviso", "Aconteceu algo.", sobre, 1)
+
+    assert onde in emails()[0]
+
+
+def test_contar_por_ler(ligacao, cliente, marketeer):
+    servico.notificar(ligacao, cliente, "A", "Um.", modelos.SOBRE_CRIATIVO, 1)
+    servico.notificar(ligacao, cliente, "B", "Dois.", modelos.SOBRE_CRIATIVO, 2)
+    servico.notificar(ligacao, marketeer, "C", "Três.", modelos.SOBRE_CRIATIVO, 3)
+
+    assert servico.contar_por_ler(ligacao, cliente) == 2
+    assert servico.contar_por_ler(ligacao, marketeer) == 1
+
+
+def test_abrir_marca_a_notificacao_como_lida(ligacao, cliente):
+    notificacao = servico.notificar(ligacao, cliente, "A", "Um.", modelos.SOBRE_CRIATIVO, 1)
+
+    aberta = servico.abrir(ligacao, cliente, notificacao.id)
+
+    assert aberta.lida is True
+    assert servico.contar_por_ler(ligacao, cliente) == 0
+    assert servico.abrir(ligacao, cliente, notificacao.id).lida is True
+
+
+def test_nao_se_abre_a_notificacao_de_outro(ligacao, cliente, jose):
+    notificacao = servico.notificar(ligacao, cliente, "A", "Um.", modelos.SOBRE_CRIATIVO, 1)
+
+    with pytest.raises(ErroValidacao, match=f"Não tem nenhuma notificação com o número {notificacao.id}."):
+        servico.abrir(ligacao, jose, notificacao.id)
+
+    assert servico.contar_por_ler(ligacao, cliente) == 1
+
+
+def test_marcar_todas_como_lidas(ligacao, cliente, marketeer):
+    servico.notificar(ligacao, cliente, "A", "Um.", modelos.SOBRE_CRIATIVO, 1)
+    servico.notificar(ligacao, cliente, "B", "Dois.", modelos.SOBRE_CRIATIVO, 2)
+    servico.notificar(ligacao, marketeer, "C", "Três.", modelos.SOBRE_CRIATIVO, 3)
+
+    assert servico.marcar_todas_como_lidas(ligacao, cliente) == 2
+    assert servico.contar_por_ler(ligacao, cliente) == 0
+    assert servico.contar_por_ler(ligacao, marketeer) == 1
