@@ -403,3 +403,19 @@ class Notificacao:
     def nome_item(self) -> str:
         """O item da notificação tal como aparece nas listas, por exemplo ``"Criativo n.º 3"``."""
         return f"{NOMES_SOBRE[self.sobre]} n.º {self.item_id}"
+
+
+@dataclass
+class Atividade:
+    """Uma alteração feita por um marketeer, registada para o painel do Administrador.
+
+    :param id: Identificador na base de dados.
+    :param utilizador_id: Identificador do marketeer.
+    :param descricao: O que fez, por exemplo ``"Criou o criativo Banner (campanha Natal 2026)"``.
+    :param registada_em: Data e hora em que o fez.
+    """
+
+    id: int
+    utilizador_id: int
+    descricao: str
+    registada_em: datetime
