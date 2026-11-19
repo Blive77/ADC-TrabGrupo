@@ -522,6 +522,7 @@ def test_menu_tem_as_opcoes_pela_ordem_certa():
         "Atualizar estado",
         "Anexar ficheiro",
         "Pré-visualizar ficheiro",
+        "Responder a comentário",
     ]
 
 
@@ -1225,6 +1226,7 @@ def test_opcoes_do_menu_do_cliente():
         "Aprovar ou rejeitar criativo",
         "Pré-visualizar ficheiro",
         "Descarregar ficheiro",
+        "Comentar criativo",
     ]
 
 

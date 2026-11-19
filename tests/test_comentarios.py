@@ -5,6 +5,7 @@ from datetime import date, datetime
 import pytest
 
 from gestor_campanhas import modelos, relogio, seguranca
+from gestor_campanhas.cli import criativos as menu
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
 from gestor_campanhas.repositorios import comentarios as repositorio
@@ -197,3 +198,146 @@ def test_conta_os_comentarios_por_responder_de_cada_criativo(ligacao, contas, na
     servico.responder(ligacao, marketeer, respondido.id, "Obrigado")
 
     assert servico.por_responder(ligacao, natal) == {banner.id: 2}
+
+
+# --- menus -------------------------------------------------------------------
+
+
+def test_detalhe_do_marketeer_sem_comentarios(teclado, ligacao, contas, natal, banner, capsys):
+    teclado(str(banner.id), "")
+
+    menu.ver(ligacao, contas[modelos.MARKETEER], natal)
+
+    assert "Comentários: nenhum." in capsys.readouterr().out
+
+
+def test_detalhe_do_marketeer_mostra_os_comentarios_e_as_respostas(
+    teclado, ligacao, contas, natal, banner, comentario, capsys
+):
+    resposta = servico.responder(ligacao, contas[modelos.MARKETEER], comentario.id, "Vou aumentá-lo")
+    segundo = servico.comentar(ligacao, contas[modelos.CLIENTE], banner.id, "Mudem a cor do fundo")
+    teclado(str(banner.id), "")
+
+    menu.ver(ligacao, contas[modelos.MARKETEER], natal)
+
+    saida = capsys.readouterr().out
+    assert (
+        "Comentários\n"
+        f"  N.º {comentario.id}, de Carla Cliente, em 2026-11-19 10:00:\n"
+        "    O logótipo devia ser maior\n"
+        "    Resposta de Miguel Marketeer, em 2026-11-19 10:00:\n"
+        "      Vou aumentá-lo\n"
+        f"  N.º {segundo.id}, de Carla Cliente, em 2026-11-19 10:00:\n"
+        "    Mudem a cor do fundo\n"
+        "    (ainda sem resposta)\n"
+    ) in saida
+    assert resposta.id != segundo.id
+
+
+def test_detalhe_do_cliente_mostra_os_comentarios(teclado, ligacao, contas, banner, comentario, capsys):
+    teclado(str(banner.id), "")
+
+    menu.ver_do_cliente(ligacao, contas[modelos.CLIENTE])
+
+    saida = capsys.readouterr().out
+    assert f"N.º {comentario.id}, de Carla Cliente, em 2026-11-19 10:00:" in saida
+    assert "(ainda sem resposta)" in saida
+
+
+def test_menu_do_cliente_guarda_um_comentario(teclado, ligacao, contas, banner, capsys):
+    teclado(str(banner.id), "Mudem a cor do fundo", "")
+
+    menu.comentar(ligacao, contas[modelos.CLIENTE])
+
+    saida = capsys.readouterr().out
+    assert "Criativo Banner de Natal, da campanha Natal 2026. Estado: Em preparação." in saida
+    assert "Comentários: nenhum." in saida
+    assert "Comentário guardado. O marketeer vai vê-lo no detalhe do criativo." in saida
+    assert [comentario.texto for comentario in repositorio.listar_por_criativo(ligacao, banner.id)] == [
+        "Mudem a cor do fundo"
+    ]
+
+
+def test_menu_do_cliente_cancela_o_comentario_com_enter(teclado, ligacao, contas, banner, capsys):
+    teclado(str(banner.id), "")
+
+    menu.comentar(ligacao, contas[modelos.CLIENTE])
+
+    assert repositorio.listar_por_criativo(ligacao, banner.id) == []
+
+
+def test_menu_do_cliente_nao_comenta_criativos_de_outro(teclado, ligacao, banner, jose, capsys):
+    teclado(str(banner.id), "")
+
+    menu.comentar(ligacao, jose)
+
+    assert f"Não tem nenhum criativo com o número {banner.id}." in capsys.readouterr().out
+    assert repositorio.listar_por_criativo(ligacao, banner.id) == []
+
+
+def test_menu_do_marketeer_guarda_a_resposta(teclado, ligacao, contas, natal, banner, comentario, capsys):
+    teclado(str(banner.id), str(comentario.id), "Vou aumentá-lo", "")
+
+    menu.responder(ligacao, contas[modelos.MARKETEER], natal)
+
+    saida = capsys.readouterr().out
+    assert "Criativo Banner de Natal" in saida
+    assert "(ainda sem resposta)" in saida
+    assert "Resposta guardada. O cliente vai vê-la no detalhe do criativo." in saida
+    respostas = servico.conversa(ligacao, banner)[0][1]
+    assert [resposta.texto for resposta in respostas] == ["Vou aumentá-lo"]
+
+
+def test_menu_do_marketeer_avisa_quando_nao_ha_comentarios(teclado, ligacao, contas, natal, banner, capsys):
+    teclado(str(banner.id), "")
+
+    menu.responder(ligacao, contas[modelos.MARKETEER], natal)
+
+    assert "O criativo Banner de Natal ainda não tem comentários do cliente." in capsys.readouterr().out
+
+
+def test_menu_do_marketeer_so_responde_a_comentarios_do_criativo(
+    teclado, ligacao, contas, natal, banner, comentario, capsys
+):
+    resposta = servico.responder(ligacao, contas[modelos.MARKETEER], comentario.id, "Vou aumentá-lo")
+    teclado(str(banner.id), str(resposta.id), "")
+
+    menu.responder(ligacao, contas[modelos.MARKETEER], natal)
+
+    saida = capsys.readouterr().out
+    assert f"Este criativo não tem nenhum comentário do cliente com o número {resposta.id}." in saida
+    assert len(repositorio.listar_por_criativo(ligacao, banner.id)) == 2
+
+
+def test_lista_do_marketeer_avisa_dos_comentarios_por_responder(
+    teclado, ligacao, contas, natal, banner, comentario, capsys
+):
+    teclado("0")
+
+    menu.da_campanha(ligacao, contas[modelos.MARKETEER], natal)
+
+    assert f"Há 1 comentário do cliente por responder (criativo n.º {banner.id})." in capsys.readouterr().out
+
+
+def test_lista_do_marketeer_conta_os_comentarios_de_varios_criativos(
+    teclado, ligacao, contas, natal, banner, comentario, capsys
+):
+    video = criativos_bd.criar(ligacao, natal.id, "Vídeo da montra", "")
+    servico.comentar(ligacao, contas[modelos.CLIENTE], video.id, "Está ótimo")
+    teclado("0")
+
+    menu.da_campanha(ligacao, contas[modelos.MARKETEER], natal)
+
+    saida = capsys.readouterr().out
+    assert f"Há 2 comentários do cliente por responder (criativos n.º {banner.id}, {video.id})." in saida
+
+
+def test_lista_do_marketeer_sem_comentarios_por_responder_nao_avisa(
+    teclado, ligacao, contas, natal, banner, comentario, capsys
+):
+    servico.responder(ligacao, contas[modelos.MARKETEER], comentario.id, "Vou aumentá-lo")
+    teclado("0")
+
+    menu.da_campanha(ligacao, contas[modelos.MARKETEER], natal)
+
+    assert "por responder" not in capsys.readouterr().out
