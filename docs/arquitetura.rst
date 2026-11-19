@@ -474,3 +474,25 @@ omissão (:data:`gestor_campanhas.config.DIAS_SEM_ATIVIDADE`) e fica guardado
 na tabela ``configuracoes``, com a chave ``dias_sem_atividade``, quando o
 Administrador o muda. É a mesma forma de guardar o limite de inatividade das
 sessões.
+
+Relatório das campanhas
+-----------------------
+
+O relatório do Cliente é montado por
+:func:`gestor_campanhas.servicos.relatorios.linhas`, a partir das mesmas
+funções que mostram as campanhas e a despesa no ecrã, e gravado por
+:func:`gestor_campanhas.servicos.relatorios.exportar` com o módulo ``csv``
+da biblioteca padrão. O formato pensa no Excel em português:
+
+* as colunas são separadas por ``;``, porque a vírgula é a das casas
+  decimais;
+* os valores em euros vão sem ``€`` e sem o espaço dos milhares
+  (:func:`gestor_campanhas.servicos.relatorios.valor`), para serem lidos
+  como números;
+* o ficheiro é gravado em UTF-8 com a marca inicial (``utf-8-sig``), sem a
+  qual o Excel mostra os acentos trocados.
+
+O nome do ficheiro é escolhido por
+:func:`gestor_campanhas.servicos.ficheiros.caminho_livre`, a mesma função que
+escolhe o nome de um ficheiro descarregado, por isso nenhum ficheiro que já
+esteja na pasta é apagado.

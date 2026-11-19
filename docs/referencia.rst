@@ -177,6 +177,11 @@ Painel de marketeers
 
 .. automodule:: gestor_campanhas.servicos.painel
 
+Relatório das campanhas
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.relatorios
+
 Budget
 ~~~~~~
 

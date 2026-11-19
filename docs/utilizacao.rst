@@ -1092,6 +1092,25 @@ budget dela, com o valor anterior, o valor novo, a data e o motivo de cada
 uma, como no menu do Administrador. Um cliente só vê o histórico das suas
 campanhas.
 
+**Exportar relatório** grava um relatório das campanhas do cliente num
+ficheiro CSV, para partilhar ou abrir no Excel. Pede a pasta onde o guardar;
+com Enter, vai para a pasta ``Downloads`` (Transferências). O ficheiro chama-se
+``relatorio-campanhas-AAAA-MM-DD.csv``, com a data do dia, e se já houver um
+com esse nome o novo fica com um número entre parênteses, como nos ficheiros
+descarregados.
+
+O relatório tem uma linha por criativo, com estas colunas:
+
+.. code-block:: text
+
+   Campanha;Estado da campanha;Início;Fim;Marketeer;Budget (€);Despesa (€);Restante (€);Criativo;Estado do criativo;Plataforma;Prazo;Custo (€)
+   Natal 2026;Por começar;2026-12-01;2026-12-24;Miguel Marketeer;1500,00;1300,00;200,00;Banner de Natal;Publicado;Facebook;2026-11-25;400,00
+
+Uma campanha sem criativos tem uma linha só com as colunas da campanha. As
+colunas são separadas por ``;`` e os valores em euros usam a vírgula e não
+levam o símbolo ``€``: é o formato que o Excel em português abre diretamente,
+com cada valor na sua coluna e reconhecido como número.
+
 Criativos
 ~~~~~~~~~
 
