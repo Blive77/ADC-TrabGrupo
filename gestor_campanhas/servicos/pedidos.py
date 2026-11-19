@@ -172,7 +172,7 @@ def aprovar(
     A campanha fica com o objetivo do pedido, com o prazo do pedido como data
     de fim, com o budget inicial indicado e com o marketeer escolhido. O
     budget inicial fica registado no histórico do budget da campanha. O
-    cliente e o marketeer são avisados por email.
+    cliente é avisado por email; o marketeer recebe também uma notificação.
 
     :param ligacao: Ligação aberta à base de dados.
     :param identificador: Número do pedido.
@@ -204,7 +204,7 @@ def aprovar(
         f"Foi criada a campanha {campanha.nome}, com um budget inicial de {dinheiro.formatar(centimos)}.\n"
         f"O marketeer responsável é {marketeer.nome}.",
     )
-    campanhas.avisar_marketeer(marketeer, campanha)
+    campanhas.avisar_marketeer(ligacao, marketeer, campanha)
     return pedido
 
 

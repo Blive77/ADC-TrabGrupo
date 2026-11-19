@@ -6,17 +6,21 @@ detalhe do criativo e responde a cada um.
 
 Um comentário pode ter várias respostas. Uma resposta não tem respostas: para
 continuar a conversa, o cliente escreve um comentário novo.
+
+O marketeer recebe uma notificação de cada comentário novo, e o cliente de
+cada resposta (ver :mod:`gestor_campanhas.servicos.notificacoes`).
 """
 
 from __future__ import annotations
 
 import sqlite3
 
+from gestor_campanhas import modelos
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.modelos import Campanha, Comentario, Criativo, Utilizador
-from gestor_campanhas.repositorios import comentarios
+from gestor_campanhas.repositorios import campanhas, comentarios, utilizadores
 from gestor_campanhas.repositorios import criativos as criativos_bd
-from gestor_campanhas.servicos import criativos
+from gestor_campanhas.servicos import criativos, notificacoes
 
 
 def _texto_validado(texto: str) -> str:
@@ -30,7 +34,8 @@ def _texto_validado(texto: str) -> str:
 def comentar(ligacao: sqlite3.Connection, cliente: Utilizador, criativo_id: int, texto: str) -> Comentario:
     """Guarda um comentário do cliente sobre um criativo de uma campanha dele.
 
-    O criativo pode estar em qualquer estado.
+    O criativo pode estar em qualquer estado. O marketeer responsável pela
+    campanha é notificado.
 
     :param ligacao: Ligação aberta à base de dados.
     :param cliente: Cliente que está a comentar.
@@ -41,7 +46,18 @@ def comentar(ligacao: sqlite3.Connection, cliente: Utilizador, criativo_id: int,
         ou se o texto ficar vazio.
     """
     criativo = criativos.obter_do_cliente(ligacao, cliente, criativo_id)
-    return comentarios.criar(ligacao, criativo.id, cliente.id, _texto_validado(texto))
+    comentario = comentarios.criar(ligacao, criativo.id, cliente.id, _texto_validado(texto))
+    campanha = campanhas.obter_por_id(ligacao, criativo.campanha_id)
+    notificacoes.notificar(
+        ligacao,
+        utilizadores.obter_por_id(ligacao, campanha.marketeer_id),
+        "Novo comentário a um criativo",
+        f"{cliente.nome} comentou o criativo {criativo.nome}, da campanha {criativo.campanha_nome}: "
+        f"{comentario.texto}",
+        modelos.SOBRE_CRIATIVO,
+        criativo.id,
+    )
+    return comentario
 
 
 def obter_do_marketeer(ligacao: sqlite3.Connection, marketeer: Utilizador, identificador: int) -> Comentario:
@@ -68,6 +84,8 @@ def obter_do_marketeer(ligacao: sqlite3.Connection, marketeer: Utilizador, ident
 def responder(ligacao: sqlite3.Connection, marketeer: Utilizador, comentario_id: int, texto: str) -> Comentario:
     """Guarda a resposta do marketeer a um comentário do cliente.
 
+    Quem escreveu o comentário é notificado.
+
     :param ligacao: Ligação aberta à base de dados.
     :param marketeer: Marketeer responsável pela campanha do criativo.
     :param comentario_id: Número do comentário a que responde.
@@ -79,7 +97,17 @@ def responder(ligacao: sqlite3.Connection, marketeer: Utilizador, comentario_id:
     comentario = obter_do_marketeer(ligacao, marketeer, comentario_id)
     if comentario.resposta_a is not None:
         raise ErroValidacao("Só se pode responder a um comentário do cliente, e não a uma resposta.")
-    return comentarios.criar(ligacao, comentario.criativo_id, marketeer.id, _texto_validado(texto), comentario.id)
+    resposta = comentarios.criar(ligacao, comentario.criativo_id, marketeer.id, _texto_validado(texto), comentario.id)
+    criativo = criativos_bd.obter_por_id(ligacao, comentario.criativo_id)
+    notificacoes.notificar(
+        ligacao,
+        utilizadores.obter_por_id(ligacao, comentario.autor_id),
+        "Resposta ao seu comentário",
+        f"{marketeer.nome} respondeu ao seu comentário sobre o criativo {criativo.nome}: {resposta.texto}",
+        modelos.SOBRE_CRIATIVO,
+        criativo.id,
+    )
+    return resposta
 
 
 def conversa(ligacao: sqlite3.Connection, criativo: Criativo) -> list[tuple[Comentario, list[Comentario]]]:

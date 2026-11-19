@@ -10,7 +10,12 @@ from gestor_campanhas.repositorios import campanhas as campanhas_bd
 from gestor_campanhas.repositorios import criativos as criativos_bd
 from gestor_campanhas.repositorios import notificacoes as repositorio
 from gestor_campanhas.repositorios import utilizadores
+from gestor_campanhas.servicos import budget as servico_budget
+from gestor_campanhas.servicos import campanhas as servico_campanhas
+from gestor_campanhas.servicos import comentarios as servico_comentarios
+from gestor_campanhas.servicos import criativos as servico_criativos
 from gestor_campanhas.servicos import notificacoes as servico
+from gestor_campanhas.servicos import pedidos as servico_pedidos
 from tests.conftest import PASSWORD_TESTE
 
 
@@ -177,3 +182,176 @@ def test_marcar_todas_como_lidas(ligacao, cliente, marketeer):
     assert servico.marcar_todas_como_lidas(ligacao, cliente) == 2
     assert servico.contar_por_ler(ligacao, cliente) == 0
     assert servico.contar_por_ler(ligacao, marketeer) == 1
+
+
+# --- quem é notificado, e de quê ---------------------------------------------
+
+
+def _unica(ligacao, utilizador):
+    """Devolve a única notificação de um utilizador (falha se houver outro número)."""
+    (notificacao,) = servico.listar(ligacao, utilizador)
+    return notificacao
+
+
+@pytest.fixture
+def marta(ligacao):
+    """Uma segunda marketeer, sem campanhas."""
+    return utilizadores.criar(
+        ligacao, "Marta Marques", "marta@agencia.pt", seguranca.gerar_hash(PASSWORD_TESTE), modelos.MARKETEER
+    )
+
+
+def test_marketeer_e_notificado_quando_recebe_uma_campanha(ligacao, natal, marta, emails):
+    servico_campanhas.atribuir_marketeer(ligacao, natal.id, marta.id)
+
+    notificacao = _unica(ligacao, marta)
+    assert notificacao.texto == "Passou a ser responsável pela campanha Natal 2026, do cliente Carla Cliente."
+    assert (notificacao.sobre, notificacao.item_id) == (modelos.SOBRE_CAMPANHA, natal.id)
+    (email,) = emails()
+    assert "Assunto: Foi-lhe atribuída uma campanha" in email
+
+
+def test_marketeer_e_notificado_da_campanha_de_um_pedido_aprovado(ligacao, cliente, marketeer):
+    pedido = servico_pedidos.criar(ligacao, cliente, "Vender bolo-rei", "600", "2026-12-15", ["Facebook"])
+
+    aprovado = servico_pedidos.aprovar(ligacao, pedido.id, "Bolo-rei", "600", marketeer.id)
+
+    notificacao = _unica(ligacao, marketeer)
+    assert notificacao.texto == "Passou a ser responsável pela campanha Bolo-rei, do cliente Carla Cliente."
+    assert notificacao.item_id == aprovado.campanha_id
+
+
+def test_marketeer_e_notificado_de_um_pedido_de_budget(ligacao, cliente, marketeer, natal):
+    pedido = servico_budget.pedir(ligacao, cliente, natal.id, "2000", "Mais vídeos")
+
+    notificacao = _unica(ligacao, marketeer)
+    assert notificacao.texto == (
+        f"Carla Cliente pediu para alterar o budget da campanha Natal 2026 de 1 500,00 € para 2 000,00 € "
+        f"(pedido n.º {pedido.id})."
+    )
+    assert (notificacao.sobre, notificacao.item_id) == (modelos.SOBRE_PEDIDO_BUDGET, pedido.id)
+    assert servico.listar(ligacao, cliente) == []
+
+
+def test_pedido_de_budget_de_uma_campanha_sem_budget_diz_por_definir(ligacao, cliente, marketeer):
+    campanha = campanhas_bd.criar(ligacao, "Sem budget", "", cliente.id, marketeer.id)
+
+    servico_budget.pedir(ligacao, cliente, campanha.id, "900", "Começar")
+
+    assert "de Por definir para 900,00 €" in _unica(ligacao, marketeer).texto
+
+
+@pytest.fixture
+def pedido_com_parecer(ligacao, cliente, marketeer, natal):
+    """Pedido de budget da Carla (1500 € para 2000 €), já com parecer viável."""
+    pedido = servico_budget.pedir(ligacao, cliente, natal.id, "2000", "Mais vídeos")
+    servico_budget.dar_parecer(ligacao, marketeer, pedido.id, True, "Faz sentido")
+    return pedido
+
+
+def test_cliente_e_notificado_da_aprovacao_do_pedido_de_budget(ligacao, cliente, pedido_com_parecer):
+    servico_budget.aprovar(ligacao, pedido_com_parecer.id)
+
+    notificacao = _unica(ligacao, cliente)
+    assert notificacao.texto == (
+        f"O seu pedido de budget n.º {pedido_com_parecer.id} foi aprovado. "
+        "O budget da campanha Natal 2026 passou a 2 000,00 €."
+    )
+    assert (notificacao.sobre, notificacao.item_id) == (modelos.SOBRE_PEDIDO_BUDGET, pedido_com_parecer.id)
+
+
+def test_cliente_e_notificado_da_rejeicao_do_pedido_de_budget(ligacao, cliente, pedido_com_parecer):
+    servico_budget.rejeitar(ligacao, pedido_com_parecer.id, "Sem orçamento este mês")
+
+    assert _unica(ligacao, cliente).texto == (
+        f"O seu pedido de budget n.º {pedido_com_parecer.id}, para a campanha Natal 2026, foi rejeitado. "
+        "Motivo: Sem orçamento este mês"
+    )
+
+
+def test_pedido_de_budget_que_nao_pode_ser_decidido_nao_notifica_o_cliente(ligacao, cliente, marketeer, natal):
+    pedido = servico_budget.pedir(ligacao, cliente, natal.id, "2000", "Mais vídeos")
+
+    with pytest.raises(ErroValidacao):
+        servico_budget.aprovar(ligacao, pedido.id)
+
+    assert servico.listar(ligacao, cliente) == []
+
+
+def test_cliente_e_notificado_quando_um_criativo_e_criado(ligacao, cliente, marketeer, natal):
+    criativo = servico_criativos.criar(ligacao, marketeer, natal.id, "Banner de Natal")
+
+    notificacao = _unica(ligacao, cliente)
+    assert notificacao.texto == "Foi criado o criativo Banner de Natal, da campanha Natal 2026."
+    assert (notificacao.sobre, notificacao.item_id) == (modelos.SOBRE_CRIATIVO, criativo.id)
+    assert servico.listar(ligacao, marketeer) == []
+
+
+def test_cliente_e_notificado_quando_um_criativo_e_alterado(ligacao, cliente, marketeer, banner):
+    servico_criativos.editar(ligacao, marketeer, banner.id, "Banner grande")
+
+    assert _unica(ligacao, cliente).texto == "O criativo Banner grande, da campanha Natal 2026, foi alterado."
+
+
+def test_cliente_e_notificado_quando_um_criativo_vai_para_revisao(ligacao, cliente, marketeer, banner):
+    servico_criativos.mudar_estado(ligacao, marketeer, banner.id, modelos.EM_REVISAO)
+
+    assert _unica(ligacao, cliente).texto == (
+        "O criativo Banner de Natal, da campanha Natal 2026, passou a Em revisão e está à espera da sua aprovação."
+    )
+
+
+def test_cliente_e_notificado_das_outras_mudancas_de_estado(ligacao, cliente, marketeer, banner):
+    criativos_bd.definir_estado(ligacao, banner.id, modelos.APROVADO)
+
+    servico_criativos.mudar_estado(ligacao, marketeer, banner.id, modelos.PUBLICADO)
+
+    assert _unica(ligacao, cliente).texto == "O criativo Banner de Natal, da campanha Natal 2026, passou a Publicado."
+
+
+def test_cliente_e_notificado_quando_e_anexado_um_ficheiro(ligacao, cliente, marketeer, banner, tmp_path):
+    origem = tmp_path / "banner.png"
+    origem.write_bytes(b"imagem")
+
+    servico_criativos.anexar(ligacao, marketeer, banner.id, str(origem))
+
+    assert _unica(ligacao, cliente).texto == (
+        "Foi anexado o ficheiro banner.png ao criativo Banner de Natal, da campanha Natal 2026."
+    )
+
+
+def test_criativo_eliminado_notifica_sobre_a_campanha(ligacao, cliente, marketeer, natal, banner):
+    servico_criativos.eliminar(ligacao, marketeer, banner.id)
+
+    notificacao = _unica(ligacao, cliente)
+    assert notificacao.texto == "O criativo Banner de Natal, da campanha Natal 2026, foi eliminado."
+    assert (notificacao.sobre, notificacao.item_id) == (modelos.SOBRE_CAMPANHA, natal.id)
+
+
+def test_criativo_invalido_nao_notifica_ninguem(ligacao, cliente, marketeer, natal):
+    with pytest.raises(ErroValidacao):
+        servico_criativos.criar(ligacao, marketeer, natal.id, "")
+
+    assert servico.listar(ligacao, cliente) == []
+
+
+def test_marketeer_e_notificado_de_um_comentario(ligacao, cliente, marketeer, banner):
+    servico_comentarios.comentar(ligacao, cliente, banner.id, "O logótipo devia ser maior")
+
+    notificacao = _unica(ligacao, marketeer)
+    assert notificacao.texto == (
+        "Carla Cliente comentou o criativo Banner de Natal, da campanha Natal 2026: O logótipo devia ser maior"
+    )
+    assert (notificacao.sobre, notificacao.item_id) == (modelos.SOBRE_CRIATIVO, banner.id)
+
+
+def test_cliente_e_notificado_da_resposta_ao_comentario(ligacao, cliente, marketeer, banner):
+    comentario = servico_comentarios.comentar(ligacao, cliente, banner.id, "O logótipo devia ser maior")
+
+    servico_comentarios.responder(ligacao, marketeer, comentario.id, "Vou aumentá-lo")
+
+    notificacao = _unica(ligacao, cliente)
+    assert notificacao.texto == (
+        "Miguel Marketeer respondeu ao seu comentário sobre o criativo Banner de Natal: Vou aumentá-lo"
+    )
+    assert (notificacao.sobre, notificacao.item_id) == (modelos.SOBRE_CRIATIVO, banner.id)
