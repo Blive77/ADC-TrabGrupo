@@ -5,4 +5,4 @@ perfis de utilizador: Administrador, Marketeer e Cliente.
 """
 
 #: Versão da aplicação. É atualizada em cada *release*.
-__version__ = "0.5.0"
+__version__ = "0.6.0"
