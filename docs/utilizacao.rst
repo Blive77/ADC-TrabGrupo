@@ -107,6 +107,68 @@ os 15 minutos se completaram.
    esse terminal não permite escondê-la. No PowerShell, na Linha de Comandos
    e no terminal do VS Code fica escondida.
 
+Notificações
+------------
+
+O Marketeer e o Cliente recebem notificações do que lhes diz respeito:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 50 30
+
+   * - Quem recebe
+     - Quando
+     - Abre
+   * - Marketeer
+     - Passa a ser responsável por uma campanha (criada a partir de um pedido
+       aprovado, ou atribuída pelo Administrador)
+     - A campanha
+   * - Marketeer
+     - Um cliente pede a alteração do budget de uma das suas campanhas
+     - O pedido de budget
+   * - Marketeer
+     - Um cliente comenta um criativo de uma das suas campanhas
+     - O criativo
+   * - Cliente
+     - O Administrador aprova (com o budget novo) ou rejeita (com o motivo)
+       um pedido de alteração de budget
+     - O pedido de budget
+   * - Cliente
+     - O marketeer cria ou altera um criativo, muda o estado dele, anexa-lhe
+       um ficheiro, ou responde a um comentário
+     - O criativo
+   * - Cliente
+     - O marketeer elimina um criativo
+     - A campanha
+
+Cada notificação fica na aplicação e é também enviada por email (para a
+pasta ``dados/caixa_saida``). Enquanto houver notificações por ler, aparece
+por cima do menu do perfil, por exemplo
+``Tem 2 notificações por ler, na opção "Notificações".``
+
+A opção **Notificações** do menu mostra-as, da mais recente para a mais
+antiga:
+
+.. code-block:: text
+
+   N.º  Data              Estado   Sobre                   Mensagem
+   ---  ----------------  -------  ----------------------  ---------------------------------------------
+   2    2026-11-19 10:05  Por ler  Pedido de budget n.º 1  O seu pedido de budget n.º 1 foi aprovado...
+   1    2026-11-19 10:00  Lida     Criativo n.º 2          O criativo Vídeo da montra, da campanha...
+
+   2 notificações, 1 por ler.
+
+**Abrir notificação** pede o número, mostra o texto completo e, logo a
+seguir, o item a que se refere: os dados da campanha, do pedido de budget ou
+do criativo (com os comentários). A notificação passa a ``Lida``. Se o item
+já não existir, ou se já não for do utilizador (por exemplo, uma campanha que
+passou para outro marketeer), aparece uma mensagem a dizê-lo.
+
+**Marcar todas como lidas** marca de uma vez as que estão por ler. As
+notificações não se apagam.
+
+O Administrador não recebe notificações.
+
 A minha conta
 -------------
 
@@ -290,7 +352,7 @@ cancelar. Depois, a aplicação pergunta a decisão:
 marketeer responsável. O budget proposto é o orçamento do pedido; com Enter,
 mantém-se. O marketeer escolhe-se pelo número, na lista dos marketeers com a
 conta ativa. A campanha é criada com o objetivo do pedido e com o prazo do
-pedido como data de fim. O cliente e o marketeer são avisados por email.
+pedido como data de fim. O cliente é avisado por email, e o marketeer por email e com uma notificação.
 
 **Rejeitar** pede o motivo, que é obrigatório, e uma confirmação. O cliente é
 avisado por email, com o motivo, e passa a vê-lo na opção **Ver pedido**.

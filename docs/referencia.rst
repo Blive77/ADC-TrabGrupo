@@ -92,6 +92,11 @@ Comentários dos criativos
 
 .. automodule:: gestor_campanhas.repositorios.comentarios
 
+Notificações
+~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.repositorios.notificacoes
+
 Serviços
 --------
 
@@ -157,6 +162,11 @@ Comentários dos criativos
 
 .. automodule:: gestor_campanhas.servicos.comentarios
 
+Notificações
+~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.notificacoes
+
 Budget
 ~~~~~~
 
@@ -216,6 +226,11 @@ Budget
 ~~~~~~
 
 .. automodule:: gestor_campanhas.cli.budget
+
+Notificações
+~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.cli.notificacoes
 
 Opções da conta
 ~~~~~~~~~~~~~~~
