@@ -5,6 +5,8 @@ from datetime import date, datetime
 import pytest
 
 from gestor_campanhas import modelos, relogio, seguranca
+from gestor_campanhas.cli import painel as menu
+from gestor_campanhas.cli import perfis
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import atividades
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
@@ -332,3 +334,172 @@ def test_ultimas_atividades_sao_as_cinco_mais_recentes(ligacao, miguel):
         "Atividade 2",
         "Atividade 1",
     ]
+
+
+# --- menus -------------------------------------------------------------------
+
+
+def test_painel_esta_no_menu_do_administrador_depois_dos_horarios():
+    opcoes = [descricao for descricao, _ in perfis.OPCOES[modelos.ADMINISTRADOR]]
+
+    assert opcoes[6:8] == ["Horários de entrada e saída dos marketeers", "Painel de marketeers"]
+    assert dict(perfis.OPCOES[modelos.ADMINISTRADOR])["Painel de marketeers"] is menu.painel
+
+
+def test_painel_mostra_a_carga_e_a_situacao_de_cada_marketeer(
+    teclado, ligacao, contas, miguel, marta, natal, bicicletas, relogio_falso, capsys
+):
+    relogio_falso["agora"] = datetime(2026, 11, 10, 9, 0)
+    _criativo(ligacao, bicicletas, "Anúncio")
+    relogio_falso["agora"] = datetime(2026, 11, 19, 10, 0)
+    _criativo(ligacao, natal, "Banner", prazo=date(2026, 11, 15))
+    _criativo(ligacao, natal, "Vídeo", modelos.PUBLICADO)
+    teclado("0")
+
+    menu.painel(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    assert (
+        "N.º  Marketeer         Campanhas ativas  Ativos  Em atraso  Concluídos  Última atividade  Situação\n"
+        "---  ----------------  ----------------  ------  ---------  ----------  ----------------  ----------------\n"
+        f"{marta.id}    Marta Marques     1                 1       0          0           2026-11-10        "
+        "Parado há 9 dias\n"
+        f"{miguel.id}    Miguel Marketeer  1                 1       1          1           2026-11-19\n"
+    ) in saida
+    assert "Sem atividade: sem criativos ativos, ou sem mexer nos criativos há 7 dias ou mais." in saida
+    assert "Marketeers sem atividade: 1 (Marta Marques)." in saida
+    assert "1. Ver o trabalho de um marketeer" in saida
+    assert "2. Comparar num período" in saida
+    assert "3. Mudar os dias sem atividade" in saida
+
+
+def test_painel_sem_marketeers_parados(teclado, ligacao, contas, miguel, natal, capsys):
+    _criativo(ligacao, natal, "Banner")
+    teclado("0")
+
+    menu.painel(ligacao, contas[modelos.ADMINISTRADOR])
+
+    assert "Nenhum marketeer está sem atividade." in capsys.readouterr().out
+
+
+def test_ver_o_trabalho_de_um_marketeer(teclado, ligacao, contas, miguel, natal, capsys):
+    campanhas_bd.criar(ligacao, "Páscoa", "", contas[modelos.CLIENTE].id, miguel.id)
+    atrasado = _criativo(ligacao, natal, "Banner", prazo=date(2026, 11, 15))
+    publicado = _criativo(ligacao, natal, "Vídeo", modelos.PUBLICADO, prazo=date(2026, 11, 15))
+    atividades.registar(ligacao, miguel.id, "Criou o criativo Banner (campanha Natal 2026)")
+    teclado("1", str(miguel.id), "", "0")
+
+    menu.painel(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    assert "Trabalho de Miguel Marketeer" in saida
+    assert f"Campanha n.º {natal.id}: Natal 2026 (Carla Cliente), Por começar" in saida
+    assert f"{atrasado.id}    Banner    Em preparação  2026-11-15  Em atraso" in saida
+    assert f"{publicado.id}    Vídeo     Publicado      2026-11-15\n" in saida
+    assert "Páscoa (Carla Cliente), Em curso\n  Ainda não tem criativos." in saida
+    assert "Últimas atividades\n  2026-11-19 10:00  Criou o criativo Banner (campanha Natal 2026)" in saida
+
+
+def test_ver_o_trabalho_de_um_marketeer_sem_campanhas(teclado, ligacao, contas, marta, capsys):
+    teclado("1", str(marta.id), "", "0")
+
+    menu.painel(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    assert "Não é responsável por nenhuma campanha." in saida
+    assert "Últimas atividades: nenhuma registada." in saida
+
+
+def test_ver_o_trabalho_so_aceita_marketeers(teclado, ligacao, contas, capsys):
+    teclado("1", str(contas[modelos.CLIENTE].id), "", "0")
+
+    menu.painel(ligacao, contas[modelos.ADMINISTRADOR])
+
+    assert f"Não existe nenhum marketeer com o número {contas[modelos.CLIENTE].id}." in capsys.readouterr().out
+
+
+def test_comparar_num_periodo(teclado, ligacao, contas, miguel, marta, natal, capsys):
+    _criativo(ligacao, natal, "Em novembro", prazo=date(2026, 11, 15))
+    _criativo(ligacao, natal, "Publicado em novembro", modelos.PUBLICADO, prazo=date(2026, 11, 20))
+    _criativo(ligacao, natal, "Em dezembro", prazo=date(2026, 12, 5))
+    teclado("2", "2026-11-01", "2026-11-30", "", "0")
+
+    menu.painel(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    assert "Contam os criativos com o prazo dentro do período." in saida
+    assert "Carga de trabalho de 2026-11-01 a 2026-11-30" in saida
+    assert (
+        "N.º  Marketeer         Criativos  Ativos  Em atraso  Concluídos\n"
+        "---  ----------------  ---------  ------  ---------  ----------\n"
+        f"{marta.id}    Marta Marques     0          0       0          0\n"
+        f"{miguel.id}    Miguel Marketeer  2          1       1          1\n"
+    ) in saida
+
+
+@pytest.mark.parametrize(
+    ("desde", "ate", "titulo"),
+    [
+        ("2026-11-01", "", "Carga de trabalho a partir de 2026-11-01"),
+        ("", "2026-11-30", "Carga de trabalho até 2026-11-30"),
+        ("", "", "Carga de trabalho sem limite de datas"),
+    ],
+)
+def test_comparar_com_periodo_aberto(teclado, ligacao, contas, miguel, desde, ate, titulo, capsys):
+    teclado("2", desde, ate, "", "0")
+
+    menu.painel(ligacao, contas[modelos.ADMINISTRADOR])
+
+    assert titulo in capsys.readouterr().out
+
+
+def test_comparar_recusa_um_periodo_ao_contrario(teclado, ligacao, contas, miguel, capsys):
+    teclado("2", "2026-11-30", "2026-11-01", "", "0")
+
+    menu.painel(ligacao, contas[modelos.ADMINISTRADOR])
+
+    assert "A data inicial não pode ser posterior à data final." in capsys.readouterr().out
+
+
+def test_mudar_os_dias_sem_atividade(teclado, ligacao, contas, miguel, natal, relogio_falso, capsys):
+    relogio_falso["agora"] = datetime(2026, 11, 17, 9, 0)
+    _criativo(ligacao, natal, "Banner")
+    relogio_falso["agora"] = datetime(2026, 11, 19, 10, 0)
+    teclado("3", "2", "", "0")
+
+    menu.painel(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    assert "Um marketeer fica sem atividade ao fim de 7 dias sem mexer nos criativos." in saida
+    assert "Guardado. Um marketeer fica sem atividade ao fim de 2 dias." in saida
+    assert "Marketeers sem atividade: 1 (Miguel Marketeer)." in saida
+    assert "Parado há 2 dias" in saida
+    assert servico.dias_sem_atividade(ligacao) == 2
+
+
+def test_mudar_os_dias_recusa_zero(teclado, ligacao, contas, capsys):
+    teclado("3", "0", "", "0")
+
+    menu.painel(ligacao, contas[modelos.ADMINISTRADOR])
+
+    assert "O número de dias tem de ser pelo menos 1. Nada foi alterado." in capsys.readouterr().out
+    assert servico.dias_sem_atividade(ligacao) == 7
+
+
+def test_mudar_os_dias_com_enter_mantem(teclado, ligacao, contas, capsys):
+    teclado("3", "", "0")
+
+    menu.painel(ligacao, contas[modelos.ADMINISTRADOR])
+
+    assert "Guardado" not in capsys.readouterr().out
+
+
+def test_com_um_dia_o_painel_escreve_no_singular(teclado, ligacao, contas, miguel, capsys):
+    servico.definir_dias_sem_atividade(ligacao, 1)
+    teclado("3", "", "0")
+
+    menu.painel(ligacao, contas[modelos.ADMINISTRADOR])
+
+    saida = capsys.readouterr().out
+    assert "Sem atividade: sem criativos ativos, ou sem mexer nos criativos há 1 dia ou mais." in saida
+    assert "Um marketeer fica sem atividade ao fim de 1 dia sem mexer nos criativos." in saida
