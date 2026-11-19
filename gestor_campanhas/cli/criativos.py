@@ -4,11 +4,14 @@ O marketeer escolhe uma das suas campanhas e vê os criativos dela, com o
 custo, o prazo, o público-alvo e a plataforma de cada um. A partir daí pode
 criar, editar, consultar e eliminar criativos, atualizar o estado de cada
 um e anexar o ficheiro do criativo. Por baixo da lista aparece a soma do
-custo dos criativos e, se ela passar o budget da campanha, um aviso.
+custo dos criativos e, se ela passar o budget da campanha, um aviso. O
+marketeer vê os comentários do cliente no detalhe de cada criativo e
+responde-lhes.
 
 O cliente vê os criativos de todas as suas campanhas, numa só lista, pode
 filtrá-los e pesquisá-los, aprova ou rejeita os que estão em revisão, e
-pré-visualiza e descarrega os ficheiros.
+pré-visualiza e descarrega os ficheiros. Pode também comentar cada criativo,
+para dizer ao marketeer o que quer que mude.
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from gestor_campanhas.cli import comum
 from gestor_campanhas.cli.pedidos import resumir
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.modelos import Campanha, Criativo, Utilizador
-from gestor_campanhas.servicos import campanhas, criativos, ficheiros
+from gestor_campanhas.servicos import campanhas, comentarios, criativos, ficheiros
 
 
 #: O que se escreve para apagar um valor quando se edita um criativo.
@@ -103,6 +106,50 @@ def mostrar_detalhes(criativo: Criativo) -> None:
     if criativo.estado == modelos.REJEITADO:
         print(f"  Motivo:      {criativo.motivo_rejeicao}")
     print(f"  Ficheiro:    {criativo.ficheiro or '-'}")
+
+
+def mostrar_comentarios(ligacao: sqlite3.Connection, criativo: Criativo) -> None:
+    """Mostra os comentários de um criativo, cada um com as suas respostas.
+
+    Cada comentário aparece com o número, o autor e a data. Os que ainda não
+    têm resposta dizem-no.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param criativo: Criativo a consultar.
+    """
+    lista = comentarios.conversa(ligacao, criativo)
+    if not lista:
+        print("\nComentários: nenhum.")
+        return
+    print("\nComentários")
+    for comentario, respostas in lista:
+        print(f"  N.º {comentario.id}, de {comentario.autor_nome}, em {comentario.criado_em:%Y-%m-%d %H:%M}:")
+        print(f"    {comentario.texto}")
+        for resposta in respostas:
+            print(f"    Resposta de {resposta.autor_nome}, em {resposta.criado_em:%Y-%m-%d %H:%M}:")
+            print(f"      {resposta.texto}")
+        if not respostas:
+            print("    (ainda sem resposta)")
+
+
+def avisar_comentarios_por_responder(ligacao: sqlite3.Connection, campanha: Campanha) -> None:
+    """Diz quantos comentários do cliente ainda não têm resposta, e em que criativos.
+
+    Não mostra nada se não houver comentários por responder.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param campanha: Campanha a verificar.
+    """
+    por_criativo = comentarios.por_responder(ligacao, campanha)
+    if not por_criativo:
+        return
+    total = sum(por_criativo.values())
+    numeros = ", ".join(str(numero) for numero in por_criativo)
+    if total == 1:
+        print(f"Há 1 comentário do cliente por responder (criativo n.º {numeros}).")
+    else:
+        palavra = "criativo" if len(por_criativo) == 1 else "criativos"
+        print(f"Há {total} comentários do cliente por responder ({palavra} n.º {numeros}).")
 
 
 def pedir_criativo(ligacao: sqlite3.Connection, marketeer: Utilizador, campanha: Campanha) -> Criativo | None:
@@ -236,7 +283,7 @@ def editar(ligacao: sqlite3.Connection, marketeer: Utilizador, campanha: Campanh
 
 
 def ver(ligacao: sqlite3.Connection, marketeer: Utilizador, campanha: Campanha) -> None:
-    """Pede o número de um criativo e mostra todos os dados dele.
+    """Pede o número de um criativo e mostra todos os dados dele e os comentários do cliente.
 
     :param ligacao: Ligação aberta à base de dados.
     :param marketeer: Marketeer que está a consultar.
@@ -248,6 +295,7 @@ def ver(ligacao: sqlite3.Connection, marketeer: Utilizador, campanha: Campanha) 
         return
     print()
     mostrar_detalhes(criativo)
+    mostrar_comentarios(ligacao, criativo)
     comum.pausa()
 
 
@@ -387,6 +435,44 @@ def pre_visualizar(ligacao: sqlite3.Connection, marketeer: Utilizador, campanha:
         pre_visualizar_ficheiro(criativo)
 
 
+def responder(ligacao: sqlite3.Connection, marketeer: Utilizador, campanha: Campanha) -> None:
+    """Pede o número de um criativo e de um comentário do cliente, e guarda a resposta.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param marketeer: Marketeer que está a responder.
+    :param campanha: Campanha que está a ser vista.
+    """
+    comum.titulo("Responder a comentário")
+    criativo = pedir_criativo(ligacao, marketeer, campanha)
+    if criativo is None:
+        return
+    conversa = comentarios.conversa(ligacao, criativo)
+    if not conversa:
+        print(f"\nO criativo {criativo.nome} ainda não tem comentários do cliente.")
+        comum.pausa()
+        return
+    print(f"\nCriativo {criativo.nome}")
+    mostrar_comentarios(ligacao, criativo)
+    print()
+    numero = comum.ler_numero("Número do comentário a que responde (Enter para cancelar)")
+    if numero is None:
+        return
+    if numero not in [comentario.id for comentario, _ in conversa]:
+        print(f"\nEste criativo não tem nenhum comentário do cliente com o número {numero}.")
+        comum.pausa()
+        return
+    texto = comum.ler_texto("Resposta (Enter para cancelar)", obrigatorio=False)
+    if not texto:
+        return
+    try:
+        comentarios.responder(ligacao, marketeer, numero, texto)
+    except ErroValidacao as erro:
+        print(f"\n{erro} A resposta não foi guardada.")
+    else:
+        print("\nResposta guardada. O cliente vai vê-la no detalhe do criativo.")
+    comum.pausa()
+
+
 #: Opções do menu de criativos de uma campanha. Cada opção é um par
 #: ``(descrição, função)``; a função recebe a ligação à base de dados, o
 #: marketeer e a campanha.
@@ -398,6 +484,7 @@ ACOES = [
     ("Atualizar estado", atualizar_estado),
     ("Anexar ficheiro", anexar),
     ("Pré-visualizar ficheiro", pre_visualizar),
+    ("Responder a comentário", responder),
 ]
 
 
@@ -420,6 +507,7 @@ def da_campanha(ligacao: sqlite3.Connection, marketeer: Utilizador, campanha: Ca
             gasto = criativos.despesa(ligacao, campanha)
             print(f"Custo dos criativos: {dinheiro.formatar(gasto)}. Budget da campanha: {menu_campanhas.budget(campanha)}.")
             avisar_se_passar_o_budget(ligacao, campanha)
+            avisar_comentarios_por_responder(ligacao, campanha)
         else:
             print("Esta campanha ainda não tem criativos.")
         escolha = comum.escolher_opcao("Criativos", menu)
@@ -506,7 +594,7 @@ def pedir_criativo_do_cliente(ligacao: sqlite3.Connection, cliente: Utilizador) 
 
 
 def ver_do_cliente(ligacao: sqlite3.Connection, cliente: Utilizador) -> None:
-    """Pede o número de um criativo do cliente e mostra todos os dados dele.
+    """Pede o número de um criativo do cliente e mostra todos os dados dele e os comentários.
 
     :param ligacao: Ligação aberta à base de dados.
     :param cliente: Cliente que está a consultar.
@@ -517,6 +605,7 @@ def ver_do_cliente(ligacao: sqlite3.Connection, cliente: Utilizador) -> None:
         return
     print()
     mostrar_detalhes(criativo)
+    mostrar_comentarios(ligacao, criativo)
     comum.pausa()
 
 
@@ -664,6 +753,33 @@ def descarregar(ligacao: sqlite3.Connection, cliente: Utilizador) -> None:
     comum.pausa()
 
 
+def comentar(ligacao: sqlite3.Connection, cliente: Utilizador) -> None:
+    """Pede o número de um criativo do cliente e guarda um comentário sobre ele.
+
+    Antes de pedir o comentário, mostra os comentários que o criativo já tem.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param cliente: Cliente que está a comentar.
+    """
+    comum.titulo("Comentar criativo")
+    criativo = pedir_criativo_do_cliente(ligacao, cliente)
+    if criativo is None:
+        return
+    print(f"\nCriativo {criativo.nome}, da campanha {criativo.campanha_nome}. Estado: {criativo.nome_estado}.")
+    mostrar_comentarios(ligacao, criativo)
+    print()
+    texto = comum.ler_texto("Comentário ou sugestão (Enter para cancelar)", obrigatorio=False)
+    if not texto:
+        return
+    try:
+        comentarios.comentar(ligacao, cliente, criativo.id, texto)
+    except ErroValidacao as erro:
+        print(f"\n{erro} O comentário não foi guardado.")
+    else:
+        print("\nComentário guardado. O marketeer vai vê-lo no detalhe do criativo.")
+    comum.pausa()
+
+
 #: Opções do menu de criativos do Cliente. Cada opção é um par
 #: ``(descrição, função)``; a função recebe a ligação à base de dados e o
 #: cliente.
@@ -673,6 +789,7 @@ ACOES_DO_CLIENTE = [
     ("Aprovar ou rejeitar criativo", decidir),
     ("Pré-visualizar ficheiro", pre_visualizar_do_cliente),
     ("Descarregar ficheiro", descarregar),
+    ("Comentar criativo", comentar),
 ]
 
 
@@ -681,7 +798,8 @@ def do_cliente(ligacao: sqlite3.Connection, utilizador: Utilizador) -> None:
 
     Mostra os criativos de todas as campanhas do cliente, quantos estão à
     espera de aprovação e as opções para os filtrar, consultar, aprovar e
-    rejeitar, e para ver e descarregar os ficheiros. A lista completa volta a aparecer depois de cada opção.
+    rejeitar, para ver e descarregar os ficheiros, e para os comentar. A
+    lista completa volta a aparecer depois de cada opção.
 
     :param ligacao: Ligação aberta à base de dados.
     :param utilizador: Cliente que está a usar o menu.

@@ -87,6 +87,11 @@ Histórico do budget
 
 .. automodule:: gestor_campanhas.repositorios.alteracoes_budget
 
+Comentários dos criativos
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.repositorios.comentarios
+
 Serviços
 --------
 
@@ -146,6 +151,11 @@ Ficheiros dos criativos
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: gestor_campanhas.servicos.ficheiros
+
+Comentários dos criativos
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.comentarios
 
 Budget
 ~~~~~~
