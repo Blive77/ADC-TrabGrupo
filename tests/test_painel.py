@@ -5,10 +5,13 @@ from datetime import date, datetime
 import pytest
 
 from gestor_campanhas import modelos, relogio, seguranca
+from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import atividades
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
 from gestor_campanhas.repositorios import criativos as criativos_bd
 from gestor_campanhas.repositorios import utilizadores
+from gestor_campanhas.servicos import comentarios as servico_comentarios
+from gestor_campanhas.servicos import criativos as servico_criativos
 from tests.conftest import PASSWORD_TESTE
 
 
@@ -114,3 +117,47 @@ def test_repositorio_devolve_o_criativo_mais_recente_de_cada_marketeer(
         miguel.id: datetime(2026, 11, 21, 15, 30),
         marta.id: datetime(2026, 11, 20, 8, 0),
     }
+
+
+# --- registo da atividade ----------------------------------------------------
+
+
+def _descricoes(ligacao, marketeer):
+    """Devolve as descrições das atividades de um marketeer, da mais antiga para a mais recente."""
+    return [atividade.descricao for atividade in reversed(atividades.listar_por_utilizador(ligacao, marketeer.id, 20))]
+
+
+def test_alteracoes_aos_criativos_ficam_na_atividade_do_marketeer(ligacao, miguel, natal, tmp_path):
+    criativo = servico_criativos.criar(ligacao, miguel, natal.id, "Banner")
+    servico_criativos.editar(ligacao, miguel, criativo.id, "Banner grande")
+    origem = tmp_path / "banner.png"
+    origem.write_bytes(b"imagem")
+    servico_criativos.anexar(ligacao, miguel, criativo.id, str(origem))
+    servico_criativos.mudar_estado(ligacao, miguel, criativo.id, modelos.EM_REVISAO)
+    servico_criativos.mudar_estado(ligacao, miguel, criativo.id, modelos.EM_PREPARACAO)
+    servico_criativos.eliminar(ligacao, miguel, criativo.id)
+
+    assert _descricoes(ligacao, miguel) == [
+        "Criou o criativo Banner (campanha Natal 2026)",
+        "Editou o criativo Banner grande (campanha Natal 2026)",
+        "Anexou o ficheiro banner.png ao criativo Banner grande (campanha Natal 2026)",
+        "Passou a Em revisão o criativo Banner grande (campanha Natal 2026)",
+        "Passou a Em preparação o criativo Banner grande (campanha Natal 2026)",
+        "Eliminou o criativo Banner grande (campanha Natal 2026)",
+    ]
+
+
+def test_resposta_a_um_comentario_fica_na_atividade_do_marketeer(ligacao, contas, miguel, natal):
+    banner = criativos_bd.criar(ligacao, natal.id, "Banner", "")
+    comentario = servico_comentarios.comentar(ligacao, contas[modelos.CLIENTE], banner.id, "Maior, por favor")
+
+    servico_comentarios.responder(ligacao, miguel, comentario.id, "Combinado")
+
+    assert _descricoes(ligacao, miguel) == ["Respondeu a um comentário do criativo Banner (campanha Natal 2026)"]
+
+
+def test_alteracao_recusada_nao_fica_na_atividade(ligacao, miguel, natal):
+    with pytest.raises(ErroValidacao):
+        servico_criativos.criar(ligacao, miguel, natal.id, "")
+
+    assert _descricoes(ligacao, miguel) == []

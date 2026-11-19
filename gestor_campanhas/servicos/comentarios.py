@@ -18,7 +18,7 @@ import sqlite3
 from gestor_campanhas import modelos
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.modelos import Campanha, Comentario, Criativo, Utilizador
-from gestor_campanhas.repositorios import campanhas, comentarios, utilizadores
+from gestor_campanhas.repositorios import atividades, campanhas, comentarios, utilizadores
 from gestor_campanhas.repositorios import criativos as criativos_bd
 from gestor_campanhas.servicos import criativos, notificacoes
 
@@ -84,7 +84,8 @@ def obter_do_marketeer(ligacao: sqlite3.Connection, marketeer: Utilizador, ident
 def responder(ligacao: sqlite3.Connection, marketeer: Utilizador, comentario_id: int, texto: str) -> Comentario:
     """Guarda a resposta do marketeer a um comentário do cliente.
 
-    Quem escreveu o comentário é notificado.
+    Quem escreveu o comentário é notificado, e a resposta fica na atividade
+    do marketeer.
 
     :param ligacao: Ligação aberta à base de dados.
     :param marketeer: Marketeer responsável pela campanha do criativo.
@@ -99,6 +100,9 @@ def responder(ligacao: sqlite3.Connection, marketeer: Utilizador, comentario_id:
         raise ErroValidacao("Só se pode responder a um comentário do cliente, e não a uma resposta.")
     resposta = comentarios.criar(ligacao, comentario.criativo_id, marketeer.id, _texto_validado(texto), comentario.id)
     criativo = criativos_bd.obter_por_id(ligacao, comentario.criativo_id)
+    atividades.registar(
+        ligacao, marketeer.id, f"Respondeu a um comentário do criativo {criativo.nome} (campanha {criativo.campanha_nome})"
+    )
     notificacoes.notificar(
         ligacao,
         utilizadores.obter_por_id(ligacao, comentario.autor_id),
