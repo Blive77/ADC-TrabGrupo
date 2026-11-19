@@ -12,6 +12,7 @@ from gestor_campanhas.repositorios import criativos as criativos_bd
 from gestor_campanhas.repositorios import utilizadores
 from gestor_campanhas.servicos import comentarios as servico_comentarios
 from gestor_campanhas.servicos import criativos as servico_criativos
+from gestor_campanhas.servicos import painel as servico
 from tests.conftest import PASSWORD_TESTE
 
 
@@ -161,3 +162,173 @@ def test_alteracao_recusada_nao_fica_na_atividade(ligacao, miguel, natal):
         servico_criativos.criar(ligacao, miguel, natal.id, "")
 
     assert _descricoes(ligacao, miguel) == []
+
+
+# --- regras do painel --------------------------------------------------------
+
+
+def _criativo(ligacao, campanha, nome, estado=modelos.EM_PREPARACAO, prazo=None):
+    """Cria um criativo diretamente no repositório, já no estado pedido."""
+    criativo = criativos_bd.criar(ligacao, campanha.id, nome, "", prazo=prazo)
+    if estado != modelos.EM_PREPARACAO:
+        criativo = criativos_bd.definir_estado(ligacao, criativo.id, estado)
+    return criativo
+
+
+def _por_nome(lista):
+    return {indicadores.marketeer.nome: indicadores for indicadores in lista}
+
+
+def test_dias_sem_atividade_sao_sete_por_omissao(ligacao):
+    assert servico.dias_sem_atividade(ligacao) == 7
+
+
+def test_administrador_muda_os_dias_sem_atividade(ligacao):
+    servico.definir_dias_sem_atividade(ligacao, 3)
+
+    assert servico.dias_sem_atividade(ligacao) == 3
+
+
+def test_dias_sem_atividade_tem_de_ser_pelo_menos_um(ligacao):
+    with pytest.raises(ErroValidacao, match="O número de dias tem de ser pelo menos 1."):
+        servico.definir_dias_sem_atividade(ligacao, 0)
+
+    assert servico.dias_sem_atividade(ligacao) == 7
+
+
+@pytest.mark.parametrize(
+    ("estado", "prazo", "atrasado"),
+    [
+        (modelos.EM_PREPARACAO, date(2026, 11, 18), True),
+        (modelos.EM_REVISAO, date(2026, 11, 18), True),
+        (modelos.REJEITADO, date(2026, 11, 18), True),
+        (modelos.EM_PREPARACAO, date(2026, 11, 19), False),
+        (modelos.EM_PREPARACAO, None, False),
+        (modelos.APROVADO, date(2026, 11, 18), False),
+        (modelos.PUBLICADO, date(2026, 11, 18), False),
+    ],
+)
+def test_criativo_em_atraso(ligacao, natal, estado, prazo, atrasado):
+    criativo = _criativo(ligacao, natal, "Banner", estado, prazo)
+
+    assert servico.em_atraso(criativo) is atrasado
+
+
+def test_carga_conta_os_criativos_de_cada_marketeer(ligacao, miguel, marta, natal, bicicletas):
+    _criativo(ligacao, natal, "Atrasado", modelos.EM_PREPARACAO, date(2026, 11, 10))
+    _criativo(ligacao, natal, "Em revisão", modelos.EM_REVISAO, date(2026, 11, 30))
+    _criativo(ligacao, natal, "Rejeitado", modelos.REJEITADO)
+    _criativo(ligacao, natal, "Aprovado", modelos.APROVADO)
+    _criativo(ligacao, natal, "Publicado", modelos.PUBLICADO, date(2026, 11, 1))
+    _criativo(ligacao, bicicletas, "Anúncio")
+
+    resultado = _por_nome(servico.carga(ligacao))
+
+    assert list(resultado) == ["Marta Marques", "Miguel Marketeer"]
+    miguel_carga = resultado["Miguel Marketeer"]
+    assert (miguel_carga.campanhas_ativas, miguel_carga.ativos, miguel_carga.em_atraso, miguel_carga.concluidos) == (
+        1,
+        3,
+        1,
+        2,
+    )
+    marta_carga = resultado["Marta Marques"]
+    assert (marta_carga.campanhas_ativas, marta_carga.ativos, marta_carga.em_atraso, marta_carga.concluidos) == (
+        1,
+        1,
+        0,
+        0,
+    )
+
+
+def test_carga_num_periodo_so_conta_os_criativos_com_prazo_nesse_periodo(ligacao, miguel, natal):
+    _criativo(ligacao, natal, "Antes", prazo=date(2026, 10, 31))
+    _criativo(ligacao, natal, "Primeiro dia", prazo=date(2026, 11, 1))
+    _criativo(ligacao, natal, "Último dia", modelos.PUBLICADO, prazo=date(2026, 11, 30))
+    _criativo(ligacao, natal, "Depois", prazo=date(2026, 12, 1))
+    _criativo(ligacao, natal, "Sem prazo")
+
+    (indicadores,) = servico.carga(ligacao, date(2026, 11, 1), date(2026, 11, 30))
+
+    assert (indicadores.ativos, indicadores.concluidos) == (1, 1)
+
+
+def test_carga_com_so_uma_das_datas(ligacao, miguel, natal):
+    _criativo(ligacao, natal, "Antes", prazo=date(2026, 10, 31))
+    _criativo(ligacao, natal, "Depois", prazo=date(2026, 12, 1))
+    _criativo(ligacao, natal, "Sem prazo")
+
+    assert servico.carga(ligacao, desde=date(2026, 11, 1))[0].ativos == 1
+    assert servico.carga(ligacao, ate=date(2026, 11, 1))[0].ativos == 1
+
+
+def test_carga_recusa_um_periodo_ao_contrario(ligacao, miguel):
+    with pytest.raises(ErroValidacao, match="A data inicial não pode ser posterior à data final."):
+        servico.carga(ligacao, date(2026, 11, 30), date(2026, 11, 1))
+
+
+def test_carga_nao_inclui_marketeers_desativados(ligacao, miguel, marta):
+    utilizadores.definir_ativo(ligacao, marta.id, False)
+
+    assert [indicadores.marketeer.nome for indicadores in servico.carga(ligacao)] == ["Miguel Marketeer"]
+
+
+def test_ultima_atividade_e_a_mais_recente_entre_registos_e_criativos(
+    ligacao, miguel, marta, natal, bicicletas, relogio_falso
+):
+    _criativo(ligacao, natal, "Banner")
+    relogio_falso["agora"] = datetime(2026, 11, 20, 9, 0)
+    atividades.registar(ligacao, miguel.id, "Editou o criativo Banner")
+    relogio_falso["agora"] = datetime(2026, 11, 21, 9, 0)
+    _criativo(ligacao, bicicletas, "Anúncio")
+    relogio_falso["agora"] = datetime(2026, 11, 20, 18, 0)
+    atividades.registar(ligacao, marta.id, "Antes do criativo")
+
+    resultado = _por_nome(servico.carga(ligacao))
+
+    assert resultado["Miguel Marketeer"].ultima_atividade == datetime(2026, 11, 20, 9, 0)
+    assert resultado["Marta Marques"].ultima_atividade == datetime(2026, 11, 21, 9, 0)
+
+
+def test_marketeer_sem_nada_nao_tem_ultima_atividade(ligacao, marta):
+    (indicadores,) = servico.carga(ligacao)
+
+    assert indicadores.ultima_atividade is None
+
+
+@pytest.mark.parametrize(
+    ("ativos", "ultima", "esperado"),
+    [
+        (0, datetime(2026, 11, 19, 9, 0), "Sem criativos ativos"),
+        (2, None, "Sem atividade registada"),
+        (2, datetime(2026, 11, 12, 23, 0), "Parado há 7 dias"),
+        (2, datetime(2026, 11, 18, 8, 0), "Parado há 1 dia"),
+        (2, datetime(2026, 11, 13, 8, 0), ""),
+        (2, datetime(2026, 11, 19, 9, 0), ""),
+    ],
+)
+def test_situacao_de_um_marketeer(miguel, ativos, ultima, esperado):
+    indicadores = servico.Carga(miguel, ativos=ativos, ultima_atividade=ultima)
+    dias = 1 if esperado == "Parado há 1 dia" else 7
+
+    assert servico.situacao(indicadores, dias) == esperado
+
+
+def test_trabalho_junta_as_campanhas_aos_criativos(ligacao, contas, miguel, natal):
+    vazia = campanhas_bd.criar(ligacao, "Páscoa", "", contas[modelos.CLIENTE].id, miguel.id)
+    banner = _criativo(ligacao, natal, "Banner")
+
+    assert servico.trabalho(ligacao, miguel) == [(natal, [banner]), (vazia, [])]
+
+
+def test_ultimas_atividades_sao_as_cinco_mais_recentes(ligacao, miguel):
+    for numero in range(6):
+        atividades.registar(ligacao, miguel.id, f"Atividade {numero}")
+
+    assert [atividade.descricao for atividade in servico.ultimas_atividades(ligacao, miguel)] == [
+        "Atividade 5",
+        "Atividade 4",
+        "Atividade 3",
+        "Atividade 2",
+        "Atividade 1",
+    ]
