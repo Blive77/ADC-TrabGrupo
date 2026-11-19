@@ -141,6 +141,13 @@ CREATE TABLE IF NOT EXISTS notificacoes (
     lida INTEGER NOT NULL DEFAULT 0,
     criada_em TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS atividades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    utilizador_id INTEGER NOT NULL REFERENCES utilizadores (id),
+    descricao TEXT NOT NULL,
+    registada_em TEXT NOT NULL
+);
 """
 
 
