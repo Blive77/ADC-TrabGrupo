@@ -289,6 +289,9 @@ executadas em todos os arranques sem apagar dados.
      - Uma linha por notificação: quem a recebe, o texto, o tipo do item
        (``campanha``, ``pedido_budget`` ou ``criativo``), o número do item, se
        já foi lida e a data.
+   * - ``atividades``
+     - O registo da atividade dos marketeers: uma linha por alteração, com o
+       marketeer, a descrição e a data.
 
 Uma campanha com criativos não pode ser apagada: a coluna ``campanha_id`` da
 tabela ``criativos`` aponta para ela, e o SQLite recusa apagar uma linha a
@@ -445,3 +448,29 @@ dois níveis.
 Os comentários por responder também não são guardados: são os comentários do
 cliente que não têm nenhuma resposta, contados por
 :func:`gestor_campanhas.servicos.comentarios.por_responder`.
+
+Painel de marketeers
+--------------------
+
+Os indicadores do painel não são guardados: são calculados sempre que o
+painel é mostrado, por :func:`gestor_campanhas.servicos.painel.carga`, a
+partir dos criativos de cada marketeer. Os estados que contam como ativos e
+como concluídos estão nas constantes
+:data:`gestor_campanhas.servicos.painel.ATIVOS` e
+:data:`gestor_campanhas.servicos.painel.CONCLUIDOS`, e a regra do atraso em
+:func:`gestor_campanhas.servicos.painel.em_atraso`.
+
+A tabela ``criativos`` não guarda a data da última alteração, e o
+``CREATE TABLE IF NOT EXISTS`` não acrescentaria a coluna às bases de dados
+que já existem. Por isso a atividade tem uma tabela própria, ``atividades``,
+onde :mod:`gestor_campanhas.servicos.criativos` e
+:mod:`gestor_campanhas.servicos.comentarios` registam cada alteração feita
+por um marketeer. A última atividade de um marketeer é a mais recente dessa
+tabela ou, para os criativos que já existiam antes dela, a data de criação
+do criativo mais recente das campanhas dele.
+
+O número de dias ao fim dos quais um marketeer aparece como parado é de 7 por
+omissão (:data:`gestor_campanhas.config.DIAS_SEM_ATIVIDADE`) e fica guardado
+na tabela ``configuracoes``, com a chave ``dias_sem_atividade``, quando o
+Administrador o muda. É a mesma forma de guardar o limite de inatividade das
+sessões.

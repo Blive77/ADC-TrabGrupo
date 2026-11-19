@@ -8,7 +8,7 @@ formato ``AAAA-MM-DD``.
 from __future__ import annotations
 
 import sqlite3
-from datetime import date
+from datetime import date, datetime
 
 from gestor_campanhas import relogio
 from gestor_campanhas.modelos import Criativo
@@ -121,6 +121,37 @@ def listar_por_cliente(ligacao: sqlite3.Connection, cliente_id: int) -> list[Cri
         f"{_SELECIONAR} WHERE campanhas.cliente_id = ? ORDER BY campanhas.id, criativos.id", (cliente_id,)
     ).fetchall()
     return [_de_linha(linha) for linha in linhas]
+
+
+def listar_por_marketeer(ligacao: sqlite3.Connection, marketeer_id: int) -> list[Criativo]:
+    """Devolve os criativos de todas as campanhas de que um marketeer é responsável.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param marketeer_id: Identificador do marketeer.
+    :return: Criativos das campanhas desse marketeer, agrupados por campanha
+        e, dentro de cada campanha, pela ordem em que foram criados.
+    """
+    linhas = ligacao.execute(
+        f"{_SELECIONAR} WHERE campanhas.marketeer_id = ? ORDER BY campanhas.id, criativos.id", (marketeer_id,)
+    ).fetchall()
+    return [_de_linha(linha) for linha in linhas]
+
+
+def ultima_criacao_por_marketeer(ligacao: sqlite3.Connection) -> dict[int, datetime]:
+    """Devolve a data do criativo criado mais recentemente nas campanhas de cada marketeer.
+
+    Serve de atividade mínima para os criativos que já existiam antes de a
+    atividade dos marketeers começar a ser registada.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :return: Dicionário do identificador do marketeer para a data e hora do
+        criativo mais recente. Quem não tem criativos não aparece.
+    """
+    linhas = ligacao.execute(
+        "SELECT campanhas.marketeer_id, MAX(criativos.criado_em) AS ultima FROM criativos "
+        "JOIN campanhas ON campanhas.id = criativos.campanha_id GROUP BY campanhas.marketeer_id"
+    ).fetchall()
+    return {linha["marketeer_id"]: relogio.de_texto(linha["ultima"]) for linha in linhas}
 
 
 def atualizar(

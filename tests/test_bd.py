@@ -293,3 +293,22 @@ def test_notificacao_so_aceita_os_assuntos_previstos(ligacao, contas):
             "VALUES (?, 'Olá', 'outra_coisa', 1, '2026-11-19 10:00:00')",
             (contas["cliente"].id,),
         )
+
+
+def test_atividade_tem_de_ter_um_utilizador_que_existe(ligacao):
+    with pytest.raises(sqlite3.IntegrityError):
+        ligacao.execute(
+            "INSERT INTO atividades (utilizador_id, descricao, registada_em) "
+            "VALUES (999, 'Criou o criativo Banner', '2026-11-19 10:00:00')"
+        )
+
+
+def test_atividade_fica_registada(ligacao, contas):
+    ligacao.execute(
+        "INSERT INTO atividades (utilizador_id, descricao, registada_em) "
+        "VALUES (?, 'Criou o criativo Banner', '2026-11-19 10:00:00')",
+        (contas["marketeer"].id,),
+    )
+
+    linha = ligacao.execute("SELECT utilizador_id, descricao FROM atividades").fetchone()
+    assert tuple(linha) == (contas["marketeer"].id, "Criou o criativo Banner")

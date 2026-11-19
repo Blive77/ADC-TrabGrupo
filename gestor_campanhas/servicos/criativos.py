@@ -24,7 +24,9 @@ avisado (ver :func:`aviso_budget`).
 
 Sempre que o marketeer cria, altera ou elimina um criativo, muda o estado
 dele ou lhe anexa um ficheiro, o cliente da campanha recebe uma notificação
-(ver :mod:`gestor_campanhas.servicos.notificacoes`).
+(ver :mod:`gestor_campanhas.servicos.notificacoes`), e a alteração fica no
+registo da atividade do marketeer, que o Administrador consulta no painel de
+marketeers (ver :mod:`gestor_campanhas.servicos.painel`).
 """
 
 from __future__ import annotations
@@ -36,7 +38,7 @@ from pathlib import Path
 from gestor_campanhas import dinheiro, modelos
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.modelos import Campanha, Criativo, Utilizador
-from gestor_campanhas.repositorios import campanhas, criativos, utilizadores
+from gestor_campanhas.repositorios import atividades, campanhas, criativos, utilizadores
 from gestor_campanhas.servicos import ficheiros, gestao, notificacoes, validacao
 
 #: Estados para onde o marketeer pode mudar um criativo, a partir de cada
@@ -82,6 +84,11 @@ def avisar_cliente(
 def _nome_completo(criativo: Criativo) -> str:
     """Escreve o nome do criativo com a campanha, para as notificações."""
     return f"{criativo.nome}, da campanha {criativo.campanha_nome}"
+
+
+def _registar(ligacao: sqlite3.Connection, marketeer: Utilizador, acao: str, criativo: Criativo) -> None:
+    """Regista na atividade do marketeer o que ele fez a um criativo, por exemplo ``"Criou o criativo"``."""
+    atividades.registar(ligacao, marketeer.id, f"{acao} {criativo.nome} (campanha {criativo.campanha_nome})")
 
 
 def listar_da_campanha(ligacao: sqlite3.Connection, campanha: Campanha) -> list[Criativo]:
@@ -182,6 +189,7 @@ def criar(
         raise ErroValidacao(f"Não tem nenhuma campanha com o número {campanha_id}.")
     dados = _dados_validados(campanha, nome, descricao, custo, prazo, publico_alvo, plataforma)
     criativo = criativos.criar(ligacao, campanha.id, *dados)
+    _registar(ligacao, marketeer, "Criou o criativo", criativo)
     avisar_cliente(ligacao, criativo, "Novo criativo", f"Foi criado o criativo {_nome_completo(criativo)}.")
     return criativo
 
@@ -242,6 +250,7 @@ def editar(
     campanha = campanhas.obter_por_id(ligacao, criativo.campanha_id)
     dados = _dados_validados(campanha, nome, descricao, custo, prazo, publico_alvo, plataforma)
     criativo = criativos.atualizar(ligacao, criativo.id, *dados)
+    _registar(ligacao, marketeer, "Editou o criativo", criativo)
     avisar_cliente(ligacao, criativo, "Criativo alterado", f"O criativo {_nome_completo(criativo)}, foi alterado.")
     return criativo
 
@@ -263,6 +272,7 @@ def eliminar(ligacao: sqlite3.Connection, marketeer: Utilizador, identificador: 
         raise ErroValidacao("Um criativo publicado não pode ser eliminado.")
     criativos.eliminar(ligacao, criativo.id)
     ficheiros.apagar(criativo.id)
+    _registar(ligacao, marketeer, "Eliminou o criativo", criativo)
     avisar_cliente(
         ligacao,
         criativo,
@@ -356,6 +366,7 @@ def mudar_estado(ligacao: sqlite3.Connection, marketeer: Utilizador, identificad
         novo = modelos.NOMES_ESTADOS_CRIATIVO.get(estado, estado)
         raise ErroValidacao(f"Um criativo {criativo.nome_estado} não pode passar a {novo}.")
     criativo = criativos.definir_estado(ligacao, criativo.id, estado)
+    _registar(ligacao, marketeer, f"Passou a {criativo.nome_estado} o criativo", criativo)
     if estado == modelos.EM_REVISAO:
         assunto = "Criativo à espera da sua aprovação"
         texto = f"O criativo {_nome_completo(criativo)}, passou a Em revisão e está à espera da sua aprovação."
@@ -444,6 +455,7 @@ def anexar(ligacao: sqlite3.Connection, marketeer: Utilizador, identificador: in
         )
     nome = ficheiros.guardar(origem, criativo.id)
     criativo = criativos.definir_ficheiro(ligacao, criativo.id, nome)
+    _registar(ligacao, marketeer, f"Anexou o ficheiro {nome} ao criativo", criativo)
     avisar_cliente(
         ligacao, criativo, "Criativo alterado", f"Foi anexado o ficheiro {nome} ao criativo {_nome_completo(criativo)}."
     )

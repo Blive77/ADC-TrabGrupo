@@ -27,6 +27,11 @@ MINUTOS_VALIDADE_CODIGO = 15
 #: usado enquanto não houver outro guardado na tabela ``configuracoes``.
 MINUTOS_INATIVIDADE = 15
 
+#: Dias sem mexer nos criativos ao fim dos quais um marketeer aparece como
+#: parado no painel do Administrador. É o valor usado enquanto não houver
+#: outro guardado na tabela ``configuracoes``.
+DIAS_SEM_ATIVIDADE = 7
+
 
 def pasta_dados() -> Path:
     """Devolve a pasta onde a aplicação guarda os seus dados.

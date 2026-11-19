@@ -97,6 +97,11 @@ Notificações
 
 .. automodule:: gestor_campanhas.repositorios.notificacoes
 
+Atividade dos marketeers
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.repositorios.atividades
+
 Serviços
 --------
 
@@ -167,6 +172,11 @@ Notificações
 
 .. automodule:: gestor_campanhas.servicos.notificacoes
 
+Painel de marketeers
+~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.painel
+
 Budget
 ~~~~~~
 
@@ -231,6 +241,11 @@ Notificações
 ~~~~~~~~~~~~
 
 .. automodule:: gestor_campanhas.cli.notificacoes
+
+Painel de marketeers
+~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.cli.painel
 
 Opções da conta
 ~~~~~~~~~~~~~~~

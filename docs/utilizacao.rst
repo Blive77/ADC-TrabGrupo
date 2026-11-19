@@ -508,6 +508,59 @@ O último dia do período é incluído por inteiro.
 Uma sessão que ainda não terminou aparece com ``(em curso)`` na coluna da
 saída.
 
+Painel de marketeers
+~~~~~~~~~~~~~~~~~~~~
+
+Compara o trabalho dos marketeers com a conta ativa:
+
+.. code-block:: text
+
+   N.º  Marketeer         Campanhas ativas  Ativos  Em atraso  Concluídos  Última atividade  Situação
+   ---  ----------------  ----------------  ------  ---------  ----------  ----------------  ----------------
+   3    Marta Marques     1                 1       0          0           2026-11-10        Parado há 9 dias
+   2    Miguel Marketeer  1                 2       1          1           2026-11-19
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Coluna
+     - O que conta
+   * - Campanhas ativas
+     - Campanhas do marketeer que ainda não terminaram.
+   * - Ativos
+     - Criativos ainda com trabalho por fazer: ``Em preparação``,
+       ``Em revisão`` ou ``Rejeitado``.
+   * - Em atraso
+     - Criativos ativos cujo prazo já passou.
+   * - Concluídos
+     - Criativos ``Aprovado`` ou ``Publicado``.
+   * - Última atividade
+     - O dia da última alteração do marketeer aos criativos: criar, editar,
+       eliminar, mudar o estado, anexar um ficheiro ou responder a um
+       comentário. Os criativos criados antes de esta informação ser guardada
+       contam pelo dia em que foram criados.
+   * - Situação
+     - ``Sem criativos ativos``, ``Parado há N dias`` (sem alterações há 7
+       dias ou mais) ou ``Sem atividade registada``. Vazia quando o marketeer
+       está ativo.
+
+Por baixo da tabela aparece quantos marketeers estão sem atividade, e quais.
+
+**Ver o trabalho de um marketeer** pede o número do marketeer e mostra cada
+campanha dele, com o estado, e os criativos de cada uma, com o estado, o prazo
+e ``Em atraso`` quando é o caso. No fim aparecem as cinco últimas atividades,
+com a data e a hora.
+
+**Comparar num período** pede as datas ``Desde`` e ``Até`` (com Enter, esse
+limite não é aplicado) e mostra, para cada marketeer, os criativos com o
+prazo dentro do período: quantos são, quantos estão ativos, em atraso e
+concluídos.
+
+**Mudar os dias sem atividade** mostra o número de dias em vigor (7, de
+início) e pede o novo, que tem de ser pelo menos 1. Com Enter, fica como
+está.
+
 
 Marketeer
 ---------
