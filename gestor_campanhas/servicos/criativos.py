@@ -21,6 +21,12 @@ A cópia do ficheiro é tratada por :mod:`gestor_campanhas.servicos.ficheiros`.
 A despesa de uma campanha é a soma do custo estimado dos seus criativos,
 seja qual for o estado deles. Quando a despesa passa o budget, o marketeer é
 avisado (ver :func:`aviso_budget`).
+
+Sempre que o marketeer cria, altera ou elimina um criativo, muda o estado
+dele ou lhe anexa um ficheiro, o cliente da campanha recebe uma notificação
+(ver :mod:`gestor_campanhas.servicos.notificacoes`), e a alteração fica no
+registo da atividade do marketeer, que o Administrador consulta no painel de
+marketeers (ver :mod:`gestor_campanhas.servicos.painel`).
 """
 
 from __future__ import annotations
@@ -32,8 +38,8 @@ from pathlib import Path
 from gestor_campanhas import dinheiro, modelos
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.modelos import Campanha, Criativo, Utilizador
-from gestor_campanhas.repositorios import campanhas, criativos
-from gestor_campanhas.servicos import ficheiros, gestao, validacao
+from gestor_campanhas.repositorios import atividades, campanhas, criativos, utilizadores
+from gestor_campanhas.servicos import ficheiros, gestao, notificacoes, validacao
 
 #: Estados para onde o marketeer pode mudar um criativo, a partir de cada
 #: estado. Os estados :data:`~gestor_campanhas.modelos.APROVADO` e
@@ -49,6 +55,40 @@ PROXIMOS_ESTADOS = {
 
 #: Estados em que o marketeer pode editar um criativo.
 EDITAVEIS = (modelos.EM_PREPARACAO, modelos.REJEITADO)
+
+
+def avisar_cliente(
+    ligacao: sqlite3.Connection,
+    criativo: Criativo,
+    assunto: str,
+    texto: str,
+    sobre: str = modelos.SOBRE_CRIATIVO,
+) -> None:
+    """Notifica o cliente da campanha de um criativo.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param criativo: Criativo de que se fala.
+    :param assunto: Assunto do email.
+    :param texto: O que aconteceu.
+    :param sobre: :data:`~gestor_campanhas.modelos.SOBRE_CRIATIVO` para a
+        notificação abrir o criativo, ou
+        :data:`~gestor_campanhas.modelos.SOBRE_CAMPANHA` para abrir a campanha
+        (quando o criativo já não existe).
+    """
+    campanha = campanhas.obter_por_id(ligacao, criativo.campanha_id)
+    cliente = utilizadores.obter_por_id(ligacao, campanha.cliente_id)
+    item_id = criativo.id if sobre == modelos.SOBRE_CRIATIVO else campanha.id
+    notificacoes.notificar(ligacao, cliente, assunto, texto, sobre, item_id)
+
+
+def _nome_completo(criativo: Criativo) -> str:
+    """Escreve o nome do criativo com a campanha, para as notificações."""
+    return f"{criativo.nome}, da campanha {criativo.campanha_nome}"
+
+
+def _registar(ligacao: sqlite3.Connection, marketeer: Utilizador, acao: str, criativo: Criativo) -> None:
+    """Regista na atividade do marketeer o que ele fez a um criativo, por exemplo ``"Criou o criativo"``."""
+    atividades.registar(ligacao, marketeer.id, f"{acao} {criativo.nome} (campanha {criativo.campanha_nome})")
 
 
 def listar_da_campanha(ligacao: sqlite3.Connection, campanha: Campanha) -> list[Criativo]:
@@ -148,7 +188,10 @@ def criar(
     if campanha is None or campanha.marketeer_id != marketeer.id:
         raise ErroValidacao(f"Não tem nenhuma campanha com o número {campanha_id}.")
     dados = _dados_validados(campanha, nome, descricao, custo, prazo, publico_alvo, plataforma)
-    return criativos.criar(ligacao, campanha.id, *dados)
+    criativo = criativos.criar(ligacao, campanha.id, *dados)
+    _registar(ligacao, marketeer, "Criou o criativo", criativo)
+    avisar_cliente(ligacao, criativo, "Novo criativo", f"Foi criado o criativo {_nome_completo(criativo)}.")
+    return criativo
 
 
 def obter_do_marketeer(ligacao: sqlite3.Connection, marketeer: Utilizador, identificador: int) -> Criativo:
@@ -206,7 +249,10 @@ def editar(
         )
     campanha = campanhas.obter_por_id(ligacao, criativo.campanha_id)
     dados = _dados_validados(campanha, nome, descricao, custo, prazo, publico_alvo, plataforma)
-    return criativos.atualizar(ligacao, criativo.id, *dados)
+    criativo = criativos.atualizar(ligacao, criativo.id, *dados)
+    _registar(ligacao, marketeer, "Editou o criativo", criativo)
+    avisar_cliente(ligacao, criativo, "Criativo alterado", f"O criativo {_nome_completo(criativo)}, foi alterado.")
+    return criativo
 
 
 def eliminar(ligacao: sqlite3.Connection, marketeer: Utilizador, identificador: int) -> Criativo:
@@ -226,6 +272,14 @@ def eliminar(ligacao: sqlite3.Connection, marketeer: Utilizador, identificador: 
         raise ErroValidacao("Um criativo publicado não pode ser eliminado.")
     criativos.eliminar(ligacao, criativo.id)
     ficheiros.apagar(criativo.id)
+    _registar(ligacao, marketeer, "Eliminou o criativo", criativo)
+    avisar_cliente(
+        ligacao,
+        criativo,
+        "Criativo eliminado",
+        f"O criativo {_nome_completo(criativo)}, foi eliminado.",
+        modelos.SOBRE_CAMPANHA,
+    )
     return criativo
 
 
@@ -311,7 +365,16 @@ def mudar_estado(ligacao: sqlite3.Connection, marketeer: Utilizador, identificad
     if estado not in PROXIMOS_ESTADOS[criativo.estado]:
         novo = modelos.NOMES_ESTADOS_CRIATIVO.get(estado, estado)
         raise ErroValidacao(f"Um criativo {criativo.nome_estado} não pode passar a {novo}.")
-    return criativos.definir_estado(ligacao, criativo.id, estado)
+    criativo = criativos.definir_estado(ligacao, criativo.id, estado)
+    _registar(ligacao, marketeer, f"Passou a {criativo.nome_estado} o criativo", criativo)
+    if estado == modelos.EM_REVISAO:
+        assunto = "Criativo à espera da sua aprovação"
+        texto = f"O criativo {_nome_completo(criativo)}, passou a Em revisão e está à espera da sua aprovação."
+    else:
+        assunto = "Criativo alterado"
+        texto = f"O criativo {_nome_completo(criativo)}, passou a {criativo.nome_estado}."
+    avisar_cliente(ligacao, criativo, assunto, texto)
+    return criativo
 
 
 def _em_revisao_do_cliente(ligacao: sqlite3.Connection, cliente: Utilizador, identificador: int) -> Criativo:
@@ -391,7 +454,12 @@ def anexar(ligacao: sqlite3.Connection, marketeer: Utilizador, identificador: in
             f"Este criativo está {criativo.nome_estado}."
         )
     nome = ficheiros.guardar(origem, criativo.id)
-    return criativos.definir_ficheiro(ligacao, criativo.id, nome)
+    criativo = criativos.definir_ficheiro(ligacao, criativo.id, nome)
+    _registar(ligacao, marketeer, f"Anexou o ficheiro {nome} ao criativo", criativo)
+    avisar_cliente(
+        ligacao, criativo, "Criativo alterado", f"Foi anexado o ficheiro {nome} ao criativo {_nome_completo(criativo)}."
+    )
+    return criativo
 
 
 def ficheiro_de(criativo: Criativo) -> Path:

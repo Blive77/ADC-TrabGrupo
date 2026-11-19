@@ -199,6 +199,35 @@ ficheiro de texto da pasta ``caixa_saida``, dentro da pasta de dados. O resto
 da aplicação chama essa função como se o email fosse mesmo enviado, por isso
 trocar a simulação por um envio a sério só obriga a alterar esse módulo.
 
+Notificações
+------------
+
+Todas as notificações passam por
+:func:`gestor_campanhas.servicos.notificacoes.notificar`, que faz duas
+coisas: guarda a notificação na tabela ``notificacoes`` e envia o mesmo
+texto por email. O email acaba com uma linha a dizer onde está o item no
+menu de quem o recebe, tirada do dicionário
+:data:`gestor_campanhas.servicos.notificacoes.ONDE`.
+
+Quem decide quem é notificado são as regras de cada assunto, no fim de cada
+operação que corre bem: :mod:`gestor_campanhas.servicos.campanhas` (campanha
+atribuída), :mod:`gestor_campanhas.servicos.budget` (pedido novo e
+decisão), :mod:`gestor_campanhas.servicos.criativos` (criativo criado,
+alterado, eliminado, mudança de estado e ficheiro) e
+:mod:`gestor_campanhas.servicos.comentarios` (comentário e resposta). Como a
+notificação é a última coisa a acontecer, uma operação recusada por uma
+regra não notifica ninguém.
+
+Cada notificação guarda o tipo do item (coluna ``sobre``: ``campanha``,
+``pedido_budget`` ou ``criativo``) e o número dele (``item_id``). A coluna
+``item_id`` não é uma chave estrangeira, porque aponta para tabelas
+diferentes conforme o tipo. Ao abrir a notificação,
+:func:`gestor_campanhas.cli.notificacoes.mostrar_item` procura o item com as
+mesmas funções que os menus usam (por exemplo
+:func:`gestor_campanhas.servicos.criativos.obter_do_cliente`), por isso um
+utilizador nunca vê, por uma notificação antiga, um item a que já não tem
+acesso.
+
 Base de dados
 -------------
 
@@ -252,6 +281,17 @@ executadas em todos os arranques sem apagar dados.
      - O histórico do budget: uma linha por alteração, com a campanha, o
        budget anterior (vazio se não havia), o budget novo, o motivo, a data
        e, quando a alteração vem de um pedido aprovado, o número do pedido.
+   * - ``comentarios``
+     - Uma linha por comentário ou resposta: criativo, autor, texto, data e,
+       numa resposta, o número do comentário a que responde
+       (``resposta_a``).
+   * - ``notificacoes``
+     - Uma linha por notificação: quem a recebe, o texto, o tipo do item
+       (``campanha``, ``pedido_budget`` ou ``criativo``), o número do item, se
+       já foi lida e a data.
+   * - ``atividades``
+     - O registo da atividade dos marketeers: uma linha por alteração, com o
+       marketeer, a descrição e a data.
 
 Uma campanha com criativos não pode ser apagada: a coluna ``campanha_id`` da
 tabela ``criativos`` aponta para ela, e o SQLite recusa apagar uma linha a
@@ -263,7 +303,9 @@ Os pedidos de alteração de budget e o histórico do budget, pelo contrário,
 não impedem que a campanha seja apagada. A coluna ``campanha_id`` das tabelas
 ``pedidos_budget`` e ``alteracoes_budget`` tem ``ON DELETE CASCADE``: quando
 a campanha é apagada, os pedidos e o histórico dela são apagados com ela,
-porque não fazem sentido sem a campanha.
+porque não fazem sentido sem a campanha. O mesmo acontece aos comentários de
+um criativo: a coluna ``criativo_id`` da tabela ``comentarios`` também tem
+``ON DELETE CASCADE``.
 
 Estados de um criativo
 ----------------------
@@ -388,3 +430,69 @@ sobre essa lista:
 A regra "acima do budget" está num só sítio,
 :func:`gestor_campanhas.servicos.budget.acima_do_budget`: uma campanha sem
 budget nunca está acima do budget.
+
+Comentários dos criativos
+-------------------------
+
+Os comentários do cliente e as respostas do marketeer ficam na mesma tabela,
+``comentarios``. Uma resposta é um comentário com a coluna ``resposta_a``
+preenchida. Assim, uma só consulta traz a conversa toda de um criativo, pela
+ordem em que foi escrita.
+
+:func:`gestor_campanhas.servicos.comentarios.conversa` arruma essa lista em
+pares ``(comentário, respostas)``, que é a forma como os menus a mostram.
+Responde-se a um comentário do cliente, e não a uma resposta: para continuar
+a conversa, o cliente escreve um comentário novo. Por isso a conversa tem só
+dois níveis.
+
+Os comentários por responder também não são guardados: são os comentários do
+cliente que não têm nenhuma resposta, contados por
+:func:`gestor_campanhas.servicos.comentarios.por_responder`.
+
+Painel de marketeers
+--------------------
+
+Os indicadores do painel não são guardados: são calculados sempre que o
+painel é mostrado, por :func:`gestor_campanhas.servicos.painel.carga`, a
+partir dos criativos de cada marketeer. Os estados que contam como ativos e
+como concluídos estão nas constantes
+:data:`gestor_campanhas.servicos.painel.ATIVOS` e
+:data:`gestor_campanhas.servicos.painel.CONCLUIDOS`, e a regra do atraso em
+:func:`gestor_campanhas.servicos.painel.em_atraso`.
+
+A tabela ``criativos`` não guarda a data da última alteração, e o
+``CREATE TABLE IF NOT EXISTS`` não acrescentaria a coluna às bases de dados
+que já existem. Por isso a atividade tem uma tabela própria, ``atividades``,
+onde :mod:`gestor_campanhas.servicos.criativos` e
+:mod:`gestor_campanhas.servicos.comentarios` registam cada alteração feita
+por um marketeer. A última atividade de um marketeer é a mais recente dessa
+tabela ou, para os criativos que já existiam antes dela, a data de criação
+do criativo mais recente das campanhas dele.
+
+O número de dias ao fim dos quais um marketeer aparece como parado é de 7 por
+omissão (:data:`gestor_campanhas.config.DIAS_SEM_ATIVIDADE`) e fica guardado
+na tabela ``configuracoes``, com a chave ``dias_sem_atividade``, quando o
+Administrador o muda. É a mesma forma de guardar o limite de inatividade das
+sessões.
+
+Relatório das campanhas
+-----------------------
+
+O relatório do Cliente é montado por
+:func:`gestor_campanhas.servicos.relatorios.linhas`, a partir das mesmas
+funções que mostram as campanhas e a despesa no ecrã, e gravado por
+:func:`gestor_campanhas.servicos.relatorios.exportar` com o módulo ``csv``
+da biblioteca padrão. O formato pensa no Excel em português:
+
+* as colunas são separadas por ``;``, porque a vírgula é a das casas
+  decimais;
+* os valores em euros vão sem ``€`` e sem o espaço dos milhares
+  (:func:`gestor_campanhas.servicos.relatorios.valor`), para serem lidos
+  como números;
+* o ficheiro é gravado em UTF-8 com a marca inicial (``utf-8-sig``), sem a
+  qual o Excel mostra os acentos trocados.
+
+O nome do ficheiro é escolhido por
+:func:`gestor_campanhas.servicos.ficheiros.caminho_livre`, a mesma função que
+escolhe o nome de um ficheiro descarregado, por isso nenhum ficheiro que já
+esteja na pasta é apagado.

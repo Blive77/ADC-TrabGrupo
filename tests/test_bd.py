@@ -225,3 +225,90 @@ def test_apagar_uma_campanha_apaga_o_historico_do_budget_dela(ligacao, contas):
     ligacao.execute("DELETE FROM campanhas WHERE id = ?", (campanha_id,))
 
     assert ligacao.execute("SELECT COUNT(*) FROM alteracoes_budget").fetchone()[0] == 0
+
+
+def _criativo(ligacao, contas):
+    """Cria uma campanha com um criativo e devolve o número do criativo."""
+    cursor = ligacao.execute(
+        "INSERT INTO criativos (campanha_id, nome, criado_em) VALUES (?, 'Banner', '2026-11-19 10:00:00')",
+        (_campanha(ligacao, contas),),
+    )
+    return cursor.lastrowid
+
+
+def _comentar(ligacao, criativo_id, autor_id, resposta_a=None):
+    """Acrescenta um comentário a um criativo e devolve o número do comentário."""
+    cursor = ligacao.execute(
+        "INSERT INTO comentarios (criativo_id, autor_id, texto, resposta_a, criado_em) "
+        "VALUES (?, ?, 'O logótipo devia ser maior', ?, '2026-11-19 10:00:00')",
+        (criativo_id, autor_id, resposta_a),
+    )
+    return cursor.lastrowid
+
+
+def test_comentario_tem_de_ter_um_criativo_que_existe(ligacao, contas):
+    with pytest.raises(sqlite3.IntegrityError):
+        _comentar(ligacao, 999, contas["cliente"].id)
+
+
+def test_comentario_tem_de_ter_um_autor_que_existe(ligacao, contas):
+    criativo_id = _criativo(ligacao, contas)
+
+    with pytest.raises(sqlite3.IntegrityError):
+        _comentar(ligacao, criativo_id, 999)
+
+
+def test_apagar_um_criativo_apaga_os_comentarios_e_as_respostas(ligacao, contas):
+    criativo_id = _criativo(ligacao, contas)
+    comentario_id = _comentar(ligacao, criativo_id, contas["cliente"].id)
+    _comentar(ligacao, criativo_id, contas["marketeer"].id, resposta_a=comentario_id)
+
+    ligacao.execute("DELETE FROM criativos WHERE id = ?", (criativo_id,))
+
+    assert ligacao.execute("SELECT COUNT(*) FROM comentarios").fetchone()[0] == 0
+
+
+def test_notificacao_comeca_por_ler(ligacao, contas):
+    ligacao.execute(
+        "INSERT INTO notificacoes (utilizador_id, texto, sobre, item_id, criada_em) "
+        "VALUES (?, 'Novo criativo', 'criativo', 1, '2026-11-19 10:00:00')",
+        (contas["cliente"].id,),
+    )
+
+    assert ligacao.execute("SELECT lida FROM notificacoes").fetchone()[0] == 0
+
+
+def test_notificacao_tem_de_ter_um_utilizador_que_existe(ligacao):
+    with pytest.raises(sqlite3.IntegrityError):
+        ligacao.execute(
+            "INSERT INTO notificacoes (utilizador_id, texto, sobre, item_id, criada_em) "
+            "VALUES (999, 'Novo criativo', 'criativo', 1, '2026-11-19 10:00:00')"
+        )
+
+
+def test_notificacao_so_aceita_os_assuntos_previstos(ligacao, contas):
+    with pytest.raises(sqlite3.IntegrityError):
+        ligacao.execute(
+            "INSERT INTO notificacoes (utilizador_id, texto, sobre, item_id, criada_em) "
+            "VALUES (?, 'Olá', 'outra_coisa', 1, '2026-11-19 10:00:00')",
+            (contas["cliente"].id,),
+        )
+
+
+def test_atividade_tem_de_ter_um_utilizador_que_existe(ligacao):
+    with pytest.raises(sqlite3.IntegrityError):
+        ligacao.execute(
+            "INSERT INTO atividades (utilizador_id, descricao, registada_em) "
+            "VALUES (999, 'Criou o criativo Banner', '2026-11-19 10:00:00')"
+        )
+
+
+def test_atividade_fica_registada(ligacao, contas):
+    ligacao.execute(
+        "INSERT INTO atividades (utilizador_id, descricao, registada_em) "
+        "VALUES (?, 'Criou o criativo Banner', '2026-11-19 10:00:00')",
+        (contas["marketeer"].id,),
+    )
+
+    linha = ligacao.execute("SELECT utilizador_id, descricao FROM atividades").fetchone()
+    assert tuple(linha) == (contas["marketeer"].id, "Criou o criativo Banner")

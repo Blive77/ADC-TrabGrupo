@@ -14,7 +14,7 @@ from gestor_campanhas import dinheiro, modelos, relogio
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.modelos import AlteracaoBudget, Campanha, Utilizador
 from gestor_campanhas.repositorios import alteracoes_budget, campanhas, criativos, utilizadores
-from gestor_campanhas.servicos import correio, gestao, validacao
+from gestor_campanhas.servicos import gestao, notificacoes, validacao
 
 #: Motivo registado no histórico quando uma campanha recebe o primeiro budget.
 MOTIVO_BUDGET_INICIAL = "Budget inicial"
@@ -295,18 +295,23 @@ def marketeer_ativo(ligacao: sqlite3.Connection, identificador: int) -> Utilizad
     return marketeer
 
 
-def avisar_marketeer(marketeer: Utilizador, campanha: Campanha) -> None:
-    """Envia um email ao marketeer a dizer que passou a ser responsável por uma campanha.
+def avisar_marketeer(ligacao: sqlite3.Connection, marketeer: Utilizador, campanha: Campanha) -> None:
+    """Avisa o marketeer de que passou a ser responsável por uma campanha.
 
+    O aviso é uma notificação na plataforma e um email (ver
+    :func:`gestor_campanhas.servicos.notificacoes.notificar`).
+
+    :param ligacao: Ligação aberta à base de dados.
     :param marketeer: Marketeer que recebe o aviso.
     :param campanha: Campanha que lhe foi atribuída.
     """
-    correio.enviar(
-        marketeer.email,
+    notificacoes.notificar(
+        ligacao,
+        marketeer,
         "Foi-lhe atribuída uma campanha",
-        f"Olá, {marketeer.nome}.\n\n"
-        f"Passou a ser responsável pela campanha {campanha.nome}, do cliente {campanha.cliente_nome}.\n"
-        'Pode consultá-la na opção "Campanhas" do seu menu.',
+        f"Passou a ser responsável pela campanha {campanha.nome}, do cliente {campanha.cliente_nome}.",
+        modelos.SOBRE_CAMPANHA,
+        campanha.id,
     )
 
 
@@ -314,7 +319,7 @@ def atribuir_marketeer(ligacao: sqlite3.Connection, identificador: int, marketee
     """Atribui uma campanha a um marketeer, que passa a ser o responsável.
 
     O marketeer anterior deixa de ver a campanha. O marketeer novo é avisado
-    por email.
+    (ver :func:`avisar_marketeer`).
 
     :param ligacao: Ligação aberta à base de dados.
     :param identificador: Número da campanha.
@@ -328,7 +333,7 @@ def atribuir_marketeer(ligacao: sqlite3.Connection, identificador: int, marketee
     if campanha.marketeer_id == marketeer.id:
         raise ErroValidacao(f"{marketeer.nome} já é responsável por esta campanha.")
     campanha = campanhas.definir_marketeer(ligacao, campanha.id, marketeer.id)
-    avisar_marketeer(marketeer, campanha)
+    avisar_marketeer(ligacao, marketeer, campanha)
     return campanha
 
 

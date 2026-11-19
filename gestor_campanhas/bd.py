@@ -122,6 +122,32 @@ CREATE TABLE IF NOT EXISTS alteracoes_budget (
     pedido_budget_id INTEGER REFERENCES pedidos_budget (id) ON DELETE SET NULL,
     alterado_em TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS comentarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    criativo_id INTEGER NOT NULL REFERENCES criativos (id) ON DELETE CASCADE,
+    autor_id INTEGER NOT NULL REFERENCES utilizadores (id),
+    texto TEXT NOT NULL,
+    resposta_a INTEGER REFERENCES comentarios (id) ON DELETE CASCADE,
+    criado_em TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS notificacoes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    utilizador_id INTEGER NOT NULL REFERENCES utilizadores (id),
+    texto TEXT NOT NULL,
+    sobre TEXT NOT NULL CHECK (sobre IN ('campanha', 'pedido_budget', 'criativo')),
+    item_id INTEGER NOT NULL,
+    lida INTEGER NOT NULL DEFAULT 0,
+    criada_em TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS atividades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    utilizador_id INTEGER NOT NULL REFERENCES utilizadores (id),
+    descricao TEXT NOT NULL,
+    registada_em TEXT NOT NULL
+);
 """
 
 

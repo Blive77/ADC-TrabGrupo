@@ -1,8 +1,9 @@
 """Dados de demonstração.
 
 Cria um administrador, dois marketeers, três clientes, três campanhas, dois
-pedidos de campanha, quatro criativos e um pedido de alteração de budget,
-para se poder experimentar a aplicação logo a seguir a instalá-la. Corre-se
+pedidos de campanha, quatro criativos, um pedido de alteração de budget e um
+comentário a um criativo, para se poder experimentar a aplicação logo a
+seguir a instalá-la. Corre-se
 a partir da pasta do projeto com::
 
     python -m gestor_campanhas.dados_demo
@@ -23,6 +24,7 @@ from gestor_campanhas.cli import comum
 from gestor_campanhas.repositorios import (
     alteracoes_budget,
     campanhas,
+    comentarios,
     criativos,
     pedidos,
     pedidos_budget,
@@ -186,6 +188,17 @@ PEDIDOS_BUDGET = [
     },
 ]
 
+#: Comentários de demonstração, escritos pelo cliente da campanha. O criativo
+#: é indicado pelo nome da campanha e pelo nome do criativo, que têm de ser
+#: dos de :data:`CAMPANHAS` e :data:`CRIATIVOS`.
+COMENTARIOS = [
+    {
+        "campanha": "Natal 2026",
+        "criativo": "Vídeo da montra",
+        "texto": "Gostava que o vídeo mostrasse a montra à noite, com as luzes acesas.",
+    },
+]
+
 
 def criar_contas(ligacao: sqlite3.Connection) -> list[str]:
     """Cria as contas de demonstração que ainda não existem.
@@ -338,8 +351,35 @@ def criar_pedidos_budget(ligacao: sqlite3.Connection) -> list[str]:
     return criados
 
 
+def criar_comentarios(ligacao: sqlite3.Connection) -> list[str]:
+    """Cria os comentários de demonstração que ainda não existem.
+
+    Os criativos de demonstração têm de existir (ver :func:`criar_criativos`).
+    Um comentário já existe quando o criativo tem um comentário com o mesmo
+    texto. Se o criativo tiver sido eliminado, o comentário não é criado.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :return: Textos dos comentários criados nesta chamada.
+    """
+    criados = []
+    por_nome = {campanha.nome: campanha for campanha in campanhas.listar_todas(ligacao)}
+    for comentario in COMENTARIOS:
+        campanha = por_nome[comentario["campanha"]]
+        criativo = next(
+            (c for c in criativos.listar_por_campanha(ligacao, campanha.id) if c.nome == comentario["criativo"]), None
+        )
+        if criativo is None:
+            continue
+        existentes = [existente.texto for existente in comentarios.listar_por_criativo(ligacao, criativo.id)]
+        if comentario["texto"] in existentes:
+            continue
+        comentarios.criar(ligacao, criativo.id, campanha.cliente_id, comentario["texto"])
+        criados.append(comentario["texto"])
+    return criados
+
+
 def main() -> int:
-    """Cria as contas, as campanhas, os pedidos e os criativos e mostra as credenciais de cada conta.
+    """Cria as contas, as campanhas, os pedidos, os criativos e os comentários e mostra as credenciais de cada conta.
 
     :return: Código de saída do processo (``0`` quando termina sem erros).
     """
@@ -352,6 +392,7 @@ def main() -> int:
         pedidos_criados = criar_pedidos(ligacao)
         criativos_criados = criar_criativos(ligacao)
         pedidos_budget_criados = criar_pedidos_budget(ligacao)
+        comentarios_criados = criar_comentarios(ligacao)
     finally:
         ligacao.close()
     print(f"Contas criadas: {len(criadas)} (as restantes já existiam).")
@@ -360,6 +401,7 @@ def main() -> int:
     print(f"Pedidos de campanha criados: {len(pedidos_criados)} (os restantes já existiam).")
     print(f"Criativos criados: {len(criativos_criados)} (os restantes já existiam).")
     print(f"Pedidos de alteração de budget criados: {len(pedidos_budget_criados)} (os restantes já existiam).")
+    print(f"Comentários criados: {len(comentarios_criados)} (os restantes já existiam).")
     print()
     print("Contas de demonstração:")
     for conta in CONTAS:

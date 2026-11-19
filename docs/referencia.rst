@@ -87,6 +87,21 @@ Histórico do budget
 
 .. automodule:: gestor_campanhas.repositorios.alteracoes_budget
 
+Comentários dos criativos
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.repositorios.comentarios
+
+Notificações
+~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.repositorios.notificacoes
+
+Atividade dos marketeers
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.repositorios.atividades
+
 Serviços
 --------
 
@@ -147,6 +162,26 @@ Ficheiros dos criativos
 
 .. automodule:: gestor_campanhas.servicos.ficheiros
 
+Comentários dos criativos
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.comentarios
+
+Notificações
+~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.notificacoes
+
+Painel de marketeers
+~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.painel
+
+Relatório das campanhas
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.servicos.relatorios
+
 Budget
 ~~~~~~
 
@@ -206,6 +241,16 @@ Budget
 ~~~~~~
 
 .. automodule:: gestor_campanhas.cli.budget
+
+Notificações
+~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.cli.notificacoes
+
+Painel de marketeers
+~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: gestor_campanhas.cli.painel
 
 Opções da conta
 ~~~~~~~~~~~~~~~

@@ -48,8 +48,10 @@ pendentes, um do cliente ``jose@padaria.pt`` e outro da cliente
 primavera``) e um pedido de alteração de budget pendente, da cliente
 ``cliente@empresa.pt``, para passar o budget da campanha ``Natal 2026`` de
 1500 € para 2000 €. O budget das campanhas ``Natal 2026`` e ``Regresso às
-aulas`` fica registado no histórico do budget como ``Budget inicial``. O
-comando pode ser repetido: só acrescenta o que faltar.
+aulas`` fica registado no histórico do budget como ``Budget inicial``. Há
+ainda um comentário da cliente ``cliente@empresa.pt`` ao criativo
+``Vídeo da montra``, por responder. O comando pode ser repetido: só
+acrescenta o que faltar.
 
 Entrar e sair
 -------------
@@ -104,6 +106,68 @@ os 15 minutos se completaram.
    No terminal Git Bash a password aparece no ecrã enquanto é escrita, porque
    esse terminal não permite escondê-la. No PowerShell, na Linha de Comandos
    e no terminal do VS Code fica escondida.
+
+Notificações
+------------
+
+O Marketeer e o Cliente recebem notificações do que lhes diz respeito:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 50 30
+
+   * - Quem recebe
+     - Quando
+     - Abre
+   * - Marketeer
+     - Passa a ser responsável por uma campanha (criada a partir de um pedido
+       aprovado, ou atribuída pelo Administrador)
+     - A campanha
+   * - Marketeer
+     - Um cliente pede a alteração do budget de uma das suas campanhas
+     - O pedido de budget
+   * - Marketeer
+     - Um cliente comenta um criativo de uma das suas campanhas
+     - O criativo
+   * - Cliente
+     - O Administrador aprova (com o budget novo) ou rejeita (com o motivo)
+       um pedido de alteração de budget
+     - O pedido de budget
+   * - Cliente
+     - O marketeer cria ou altera um criativo, muda o estado dele, anexa-lhe
+       um ficheiro, ou responde a um comentário
+     - O criativo
+   * - Cliente
+     - O marketeer elimina um criativo
+     - A campanha
+
+Cada notificação fica na aplicação e é também enviada por email (para a
+pasta ``dados/caixa_saida``). Enquanto houver notificações por ler, aparece
+por cima do menu do perfil, por exemplo
+``Tem 2 notificações por ler, na opção "Notificações".``
+
+A opção **Notificações** do menu mostra-as, da mais recente para a mais
+antiga:
+
+.. code-block:: text
+
+   N.º  Data              Estado   Sobre                   Mensagem
+   ---  ----------------  -------  ----------------------  ---------------------------------------------
+   2    2026-11-19 10:05  Por ler  Pedido de budget n.º 1  O seu pedido de budget n.º 1 foi aprovado...
+   1    2026-11-19 10:00  Lida     Criativo n.º 2          O criativo Vídeo da montra, da campanha...
+
+   2 notificações, 1 por ler.
+
+**Abrir notificação** pede o número, mostra o texto completo e, logo a
+seguir, o item a que se refere: os dados da campanha, do pedido de budget ou
+do criativo (com os comentários). A notificação passa a ``Lida``. Se o item
+já não existir, ou se já não for do utilizador (por exemplo, uma campanha que
+passou para outro marketeer), aparece uma mensagem a dizê-lo.
+
+**Marcar todas como lidas** marca de uma vez as que estão por ler. As
+notificações não se apagam.
+
+O Administrador não recebe notificações.
 
 A minha conta
 -------------
@@ -288,7 +352,7 @@ cancelar. Depois, a aplicação pergunta a decisão:
 marketeer responsável. O budget proposto é o orçamento do pedido; com Enter,
 mantém-se. O marketeer escolhe-se pelo número, na lista dos marketeers com a
 conta ativa. A campanha é criada com o objetivo do pedido e com o prazo do
-pedido como data de fim. O cliente e o marketeer são avisados por email.
+pedido como data de fim. O cliente é avisado por email, e o marketeer por email e com uma notificação.
 
 **Rejeitar** pede o motivo, que é obrigatório, e uma confirmação. O cliente é
 avisado por email, com o motivo, e passa a vê-lo na opção **Ver pedido**.
@@ -443,6 +507,59 @@ O último dia do período é incluído por inteiro.
 
 Uma sessão que ainda não terminou aparece com ``(em curso)`` na coluna da
 saída.
+
+Painel de marketeers
+~~~~~~~~~~~~~~~~~~~~
+
+Compara o trabalho dos marketeers com a conta ativa:
+
+.. code-block:: text
+
+   N.º  Marketeer         Campanhas ativas  Ativos  Em atraso  Concluídos  Última atividade  Situação
+   ---  ----------------  ----------------  ------  ---------  ----------  ----------------  ----------------
+   3    Marta Marques     1                 1       0          0           2026-11-10        Parado há 9 dias
+   2    Miguel Marketeer  1                 2       1          1           2026-11-19
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Coluna
+     - O que conta
+   * - Campanhas ativas
+     - Campanhas do marketeer que ainda não terminaram.
+   * - Ativos
+     - Criativos ainda com trabalho por fazer: ``Em preparação``,
+       ``Em revisão`` ou ``Rejeitado``.
+   * - Em atraso
+     - Criativos ativos cujo prazo já passou.
+   * - Concluídos
+     - Criativos ``Aprovado`` ou ``Publicado``.
+   * - Última atividade
+     - O dia da última alteração do marketeer aos criativos: criar, editar,
+       eliminar, mudar o estado, anexar um ficheiro ou responder a um
+       comentário. Os criativos criados antes de esta informação ser guardada
+       contam pelo dia em que foram criados.
+   * - Situação
+     - ``Sem criativos ativos``, ``Parado há N dias`` (sem alterações há 7
+       dias ou mais) ou ``Sem atividade registada``. Vazia quando o marketeer
+       está ativo.
+
+Por baixo da tabela aparece quantos marketeers estão sem atividade, e quais.
+
+**Ver o trabalho de um marketeer** pede o número do marketeer e mostra cada
+campanha dele, com o estado, e os criativos de cada uma, com o estado, o prazo
+e ``Em atraso`` quando é o caso. No fim aparecem as cinco últimas atividades,
+com a data e a hora.
+
+**Comparar num período** pede as datas ``Desde`` e ``Até`` (com Enter, esse
+limite não é aplicado) e mostra, para cada marketeer, os criativos com o
+prazo dentro do período: quantos são, quantos estão ativos, em atraso e
+concluídos.
+
+**Mudar os dias sem atividade** mostra o número de dias em vigor (7, de
+início) e pede o novo, que tem de ser pelo menos 1. Com Enter, fica como
+está.
 
 
 Marketeer
@@ -644,7 +761,9 @@ Ver criativo
 ^^^^^^^^^^^^
 
 Pede o número do criativo e mostra todos os dados dele, um por linha,
-incluindo a descrição e o público-alvo completo.
+incluindo a descrição e o público-alvo completo. Por baixo aparecem os
+comentários do cliente, cada um com as respostas (ver
+`Responder a comentário`_).
 
 Eliminar criativo
 ^^^^^^^^^^^^^^^^^
@@ -717,6 +836,29 @@ Pede o número do criativo e mostra o nome, o tipo e o tamanho do ficheiro:
 
 Com ``s``, o ficheiro abre-se no programa que o sistema usa para esse tipo
 de ficheiro (por exemplo, o browser para um ``.svg``).
+
+Responder a comentário
+^^^^^^^^^^^^^^^^^^^^^^
+
+O cliente comenta os criativos para dizer o que quer que mude. Quando há
+comentários sem resposta, a lista dos criativos diz quantos são e em que
+criativos, por exemplo
+``Há 1 comentário do cliente por responder (criativo n.º 2).``
+
+Esta opção pede o número do criativo e mostra os comentários dele:
+
+.. code-block:: text
+
+   Comentários
+     N.º 1, de Carla Cliente, em 2026-11-19 10:00:
+       Gostava que o vídeo mostrasse a montra à noite, com as luzes acesas.
+       (ainda sem resposta)
+
+Depois pede o número do comentário a que se responde e a resposta. A
+resposta aparece por baixo do comentário, com o nome de quem respondeu e a
+data. Um comentário pode ter mais do que uma resposta. Só se responde a
+comentários do cliente: o número de uma resposta não é aceite. Com Enter, em
+qualquer das perguntas, nada é guardado.
 
 Pedidos de budget
 ~~~~~~~~~~~~~~~~~
@@ -950,6 +1092,25 @@ budget dela, com o valor anterior, o valor novo, a data e o motivo de cada
 uma, como no menu do Administrador. Um cliente só vê o histórico das suas
 campanhas.
 
+**Exportar relatório** grava um relatório das campanhas do cliente num
+ficheiro CSV, para partilhar ou abrir no Excel. Pede a pasta onde o guardar;
+com Enter, vai para a pasta ``Downloads`` (Transferências). O ficheiro chama-se
+``relatorio-campanhas-AAAA-MM-DD.csv``, com a data do dia, e se já houver um
+com esse nome o novo fica com um número entre parênteses, como nos ficheiros
+descarregados.
+
+O relatório tem uma linha por criativo, com estas colunas:
+
+.. code-block:: text
+
+   Campanha;Estado da campanha;Início;Fim;Marketeer;Budget (€);Despesa (€);Restante (€);Criativo;Estado do criativo;Plataforma;Prazo;Custo (€)
+   Natal 2026;Por começar;2026-12-01;2026-12-24;Miguel Marketeer;1500,00;1300,00;200,00;Banner de Natal;Publicado;Facebook;2026-11-25;400,00
+
+Uma campanha sem criativos tem uma linha só com as colunas da campanha. As
+colunas são separadas por ``;`` e os valores em euros usam a vírgula e não
+levam o símbolo ``€``: é o formato que o Excel em português abre diretamente,
+com cada valor na sua coluna e reconhecido como número.
+
 Criativos
 ~~~~~~~~~
 
@@ -995,7 +1156,8 @@ Os criativos que respeitam todos os filtros aparecem com o título
 completa.
 
 **Ver criativo** pede o número do criativo e mostra todos os dados dele,
-incluindo a descrição e o público-alvo completo.
+incluindo a descrição e o público-alvo completo, e os comentários, com as
+respostas do marketeer.
 
 Por baixo da lista aparece quantos criativos estão à espera de aprovação,
 por exemplo ``Há 1 criativo à espera da sua aprovação.``
@@ -1025,3 +1187,9 @@ Com Enter, a cópia vai para a pasta ``Downloads`` (Transferências) da pasta
 pessoal. Se já houver um ficheiro com o mesmo nome, a cópia fica com um
 número entre parênteses, por exemplo ``banner-natal (1).svg``: nenhum
 ficheiro é apagado.
+
+**Comentar criativo** pede o número do criativo, mostra os comentários que
+ele já tem e pede o comentário ou a sugestão. O comentário fica com a data e
+o nome de quem o escreveu, e o marketeer vê-o no detalhe do criativo. Pode
+comentar-se um criativo em qualquer estado. Para responder a uma resposta do
+marketeer, escreve-se um comentário novo. Com Enter, nada é guardado.

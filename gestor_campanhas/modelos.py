@@ -73,6 +73,20 @@ NOMES_ESTADOS_CRIATIVO = {
 #: Plataformas onde se pode anunciar, pela ordem em que aparecem nos menus.
 PLATAFORMAS = ("Facebook", "Instagram", "Google Ads", "LinkedIn", "TikTok", "YouTube")
 
+#: Notificação sobre uma campanha.
+SOBRE_CAMPANHA = "campanha"
+#: Notificação sobre um pedido de alteração de budget.
+SOBRE_PEDIDO_BUDGET = "pedido_budget"
+#: Notificação sobre um criativo (incluindo os comentários dele).
+SOBRE_CRIATIVO = "criativo"
+
+#: Assuntos de uma notificação, com o nome que é mostrado nas listas.
+NOMES_SOBRE = {
+    SOBRE_CAMPANHA: "Campanha",
+    SOBRE_PEDIDO_BUDGET: "Pedido de budget",
+    SOBRE_CRIATIVO: "Criativo",
+}
+
 #: Todos os perfis, com o nome que é mostrado nos menus.
 NOMES_PERFIS = {
     ADMINISTRADOR: "Administrador",
@@ -327,3 +341,81 @@ class AlteracaoBudget:
     motivo: str
     alterado_em: datetime
     pedido_budget_id: int | None = None
+
+
+@dataclass
+class Comentario:
+    """Um comentário sobre um criativo, ou a resposta a um comentário.
+
+    O cliente comenta os criativos das suas campanhas; o marketeer responde
+    a cada comentário. Uma resposta é um comentário que indica, em
+    ``resposta_a``, o comentário a que responde.
+
+    :param id: Identificador na base de dados.
+    :param criativo_id: Identificador do criativo comentado.
+    :param autor_id: Identificador de quem escreveu.
+    :param texto: O que foi escrito.
+    :param criado_em: Data e hora em que foi escrito.
+    :param resposta_a: Identificador do comentário a que esta resposta
+        responde, ou ``None`` se for um comentário do cliente.
+    :param autor_nome: Nome de quem escreveu, para mostrar no ecrã.
+    :param autor_perfil: Perfil de quem escreveu (:data:`CLIENTE` ou
+        :data:`MARKETEER`).
+    """
+
+    id: int
+    criativo_id: int
+    autor_id: int
+    texto: str
+    criado_em: datetime
+    resposta_a: int | None = None
+    autor_nome: str = ""
+    autor_perfil: str = ""
+
+
+@dataclass
+class Notificacao:
+    """Um aviso para um utilizador, sobre algo que aconteceu na plataforma.
+
+    A notificação indica o item a que se refere (uma campanha, um pedido de
+    alteração de budget ou um criativo), para se poder abrir esse item
+    diretamente a partir da lista de notificações.
+
+    :param id: Identificador na base de dados.
+    :param utilizador_id: Identificador de quem recebe a notificação.
+    :param texto: O que aconteceu, numa frase.
+    :param sobre: :data:`SOBRE_CAMPANHA`, :data:`SOBRE_PEDIDO_BUDGET` ou
+        :data:`SOBRE_CRIATIVO`.
+    :param item_id: Identificador da campanha, do pedido ou do criativo.
+    :param criada_em: Data e hora da notificação.
+    :param lida: ``True`` depois de o utilizador a abrir.
+    """
+
+    id: int
+    utilizador_id: int
+    texto: str
+    sobre: str
+    item_id: int
+    criada_em: datetime
+    lida: bool = False
+
+    @property
+    def nome_item(self) -> str:
+        """O item da notificação tal como aparece nas listas, por exemplo ``"Criativo n.º 3"``."""
+        return f"{NOMES_SOBRE[self.sobre]} n.º {self.item_id}"
+
+
+@dataclass
+class Atividade:
+    """Uma alteração feita por um marketeer, registada para o painel do Administrador.
+
+    :param id: Identificador na base de dados.
+    :param utilizador_id: Identificador do marketeer.
+    :param descricao: O que fez, por exemplo ``"Criou o criativo Banner (campanha Natal 2026)"``.
+    :param registada_em: Data e hora em que o fez.
+    """
+
+    id: int
+    utilizador_id: int
+    descricao: str
+    registada_em: datetime
