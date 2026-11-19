@@ -73,6 +73,20 @@ NOMES_ESTADOS_CRIATIVO = {
 #: Plataformas onde se pode anunciar, pela ordem em que aparecem nos menus.
 PLATAFORMAS = ("Facebook", "Instagram", "Google Ads", "LinkedIn", "TikTok", "YouTube")
 
+#: Notificação sobre uma campanha.
+SOBRE_CAMPANHA = "campanha"
+#: Notificação sobre um pedido de alteração de budget.
+SOBRE_PEDIDO_BUDGET = "pedido_budget"
+#: Notificação sobre um criativo (incluindo os comentários dele).
+SOBRE_CRIATIVO = "criativo"
+
+#: Assuntos de uma notificação, com o nome que é mostrado nas listas.
+NOMES_SOBRE = {
+    SOBRE_CAMPANHA: "Campanha",
+    SOBRE_PEDIDO_BUDGET: "Pedido de budget",
+    SOBRE_CRIATIVO: "Criativo",
+}
+
 #: Todos os perfis, com o nome que é mostrado nos menus.
 NOMES_PERFIS = {
     ADMINISTRADOR: "Administrador",
@@ -357,3 +371,35 @@ class Comentario:
     resposta_a: int | None = None
     autor_nome: str = ""
     autor_perfil: str = ""
+
+
+@dataclass
+class Notificacao:
+    """Um aviso para um utilizador, sobre algo que aconteceu na plataforma.
+
+    A notificação indica o item a que se refere (uma campanha, um pedido de
+    alteração de budget ou um criativo), para se poder abrir esse item
+    diretamente a partir da lista de notificações.
+
+    :param id: Identificador na base de dados.
+    :param utilizador_id: Identificador de quem recebe a notificação.
+    :param texto: O que aconteceu, numa frase.
+    :param sobre: :data:`SOBRE_CAMPANHA`, :data:`SOBRE_PEDIDO_BUDGET` ou
+        :data:`SOBRE_CRIATIVO`.
+    :param item_id: Identificador da campanha, do pedido ou do criativo.
+    :param criada_em: Data e hora da notificação.
+    :param lida: ``True`` depois de o utilizador a abrir.
+    """
+
+    id: int
+    utilizador_id: int
+    texto: str
+    sobre: str
+    item_id: int
+    criada_em: datetime
+    lida: bool = False
+
+    @property
+    def nome_item(self) -> str:
+        """O item da notificação tal como aparece nas listas, por exemplo ``"Criativo n.º 3"``."""
+        return f"{NOMES_SOBRE[self.sobre]} n.º {self.item_id}"
