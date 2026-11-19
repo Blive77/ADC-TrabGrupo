@@ -149,24 +149,38 @@ def abrir(ficheiro: Path) -> None:
         subprocess.run(["xdg-open", str(ficheiro)], check=True)
 
 
+def caminho_livre(destino: str, nome: str) -> Path:
+    """Escolhe o caminho de um ficheiro novo numa pasta, sem apagar nenhum que lá esteja.
+
+    Se já existir um ficheiro com o mesmo nome, o novo fica com um número
+    entre parênteses, por exemplo ``banner (1).png``.
+
+    :param destino: Pasta de destino, tal como foi escrita.
+    :param nome: Nome que o ficheiro deve ter.
+    :return: Caminho onde o ficheiro pode ser escrito.
+    :raises ErroValidacao: Se a pasta de destino não existir.
+    """
+    pasta = limpar_caminho(destino)
+    if not pasta.is_dir():
+        raise ErroValidacao(f"A pasta {pasta} não existe.")
+    caminho = pasta / nome
+    numero = 1
+    while caminho.exists():
+        caminho = pasta / f"{Path(nome).stem} ({numero}){Path(nome).suffix}"
+        numero += 1
+    return caminho
+
+
 def copiar_para(ficheiro: Path, destino: str) -> Path:
     """Copia um ficheiro para uma pasta, sem apagar nenhum ficheiro que lá esteja.
 
-    Se já existir um ficheiro com o mesmo nome, a cópia fica com um número
-    entre parênteses, por exemplo ``banner (1).png``.
+    O nome da cópia é escolhido por :func:`caminho_livre`.
 
     :param ficheiro: Caminho do ficheiro a copiar.
     :param destino: Pasta de destino, tal como foi escrita.
     :return: Caminho da cópia.
     :raises ErroValidacao: Se a pasta de destino não existir.
     """
-    pasta = limpar_caminho(destino)
-    if not pasta.is_dir():
-        raise ErroValidacao(f"A pasta {pasta} não existe.")
-    copia = pasta / ficheiro.name
-    numero = 1
-    while copia.exists():
-        copia = pasta / f"{ficheiro.stem} ({numero}){ficheiro.suffix}"
-        numero += 1
+    copia = caminho_livre(destino, ficheiro.name)
     shutil.copy2(ficheiro, copia)
     return copia
