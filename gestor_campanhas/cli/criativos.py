@@ -19,7 +19,6 @@ from __future__ import annotations
 import sqlite3
 import subprocess
 from datetime import date
-from pathlib import Path
 
 from gestor_campanhas import dinheiro, modelos
 from gestor_campanhas.cli import campanhas as menu_campanhas
@@ -719,14 +718,6 @@ def pre_visualizar_do_cliente(ligacao: sqlite3.Connection, cliente: Utilizador) 
         pre_visualizar_ficheiro(criativo)
 
 
-def pasta_transferencias() -> Path:
-    """Devolve a pasta onde os ficheiros são guardados quando não se indica outra.
-
-    :return: A pasta ``Downloads`` (Transferências) da pasta pessoal do utilizador.
-    """
-    return Path.home() / "Downloads"
-
-
 def descarregar(ligacao: sqlite3.Connection, cliente: Utilizador) -> None:
     """Pede o número de um criativo do cliente e guarda uma cópia do ficheiro dele.
 
@@ -743,9 +734,9 @@ def descarregar(ligacao: sqlite3.Connection, cliente: Utilizador) -> None:
     try:
         caminho = criativos.ficheiro_de(criativo)
         pasta = comum.ler_texto(
-            f"Pasta onde guardar a cópia (Enter para {pasta_transferencias()})", obrigatorio=False
+            f"Pasta onde guardar a cópia (Enter para {comum.pasta_transferencias()})", obrigatorio=False
         )
-        copia = ficheiros.copiar_para(caminho, pasta or str(pasta_transferencias()))
+        copia = ficheiros.copiar_para(caminho, pasta or str(comum.pasta_transferencias()))
     except ErroValidacao as erro:
         print(f"\n{erro}")
     else:

@@ -9,6 +9,7 @@ from __future__ import annotations
 import getpass
 import sys
 from datetime import date, datetime
+from pathlib import Path
 
 #: Largura, em caracteres, das linhas que delimitam os títulos.
 LARGURA = 60
@@ -135,6 +136,14 @@ def escolher_opcao(titulo_menu: str, opcoes: list[tuple[str, str]]) -> str:
         if escolha in chaves:
             return escolha
         print("Opção inválida.")
+
+
+def pasta_transferencias() -> Path:
+    """Devolve a pasta onde se guardam os ficheiros quando não se indica outra.
+
+    :return: A pasta ``Downloads`` (Transferências) da pasta pessoal do utilizador.
+    """
+    return Path.home() / "Downloads"
 
 
 def pausa() -> None:

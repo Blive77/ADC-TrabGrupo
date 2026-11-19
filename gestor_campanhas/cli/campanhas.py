@@ -14,7 +14,8 @@ esse budget, e os contactos do marketeer responsável.
 
 O Administrador e o Cliente veem também o histórico do budget de cada
 campanha: o valor anterior, o valor novo, a data e o motivo de cada
-alteração.
+alteração. O Cliente pode ainda exportar um relatório das suas campanhas,
+num ficheiro CSV.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from gestor_campanhas import dinheiro, modelos
 from gestor_campanhas.cli import comum
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.modelos import Campanha, Utilizador
-from gestor_campanhas.servicos import campanhas, criativos
+from gestor_campanhas.servicos import campanhas, criativos, relatorios
 
 #: O que se escreve para apagar uma data quando se edita uma campanha.
 APAGAR = "-"
@@ -569,13 +570,37 @@ def historico_do_cliente(ligacao: sqlite3.Connection, cliente: Utilizador) -> No
     comum.pausa()
 
 
+def exportar_relatorio(ligacao: sqlite3.Connection, cliente: Utilizador) -> None:
+    """Grava o relatório das campanhas do cliente num ficheiro CSV, na pasta indicada.
+
+    Com Enter, o ficheiro vai para a pasta Transferências. Nenhum ficheiro que
+    já lá esteja é apagado.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param cliente: Cliente que está a exportar.
+    """
+    comum.titulo("Exportar relatório")
+    print("O relatório tem uma linha por criativo, com os dados da campanha: estado, datas, marketeer,")
+    print("budget, despesa e restante. É um ficheiro CSV, que se abre no Excel ou noutra folha de cálculo.\n")
+    pasta = comum.ler_texto(
+        f"Pasta onde guardar o relatório (Enter para {comum.pasta_transferencias()})", obrigatorio=False
+    )
+    try:
+        caminho = relatorios.exportar(ligacao, cliente, pasta or str(comum.pasta_transferencias()))
+    except ErroValidacao as erro:
+        print(f"\n{erro} O relatório não foi gravado.")
+    else:
+        print(f"\nRelatório gravado em {caminho}")
+    comum.pausa()
+
+
 def do_cliente(ligacao: sqlite3.Connection, utilizador: Utilizador) -> None:
     """Opção "Campanhas" do menu do Cliente.
 
     Mostra as campanhas do cliente, com o budget de cada uma, e deixa ver os
-    detalhes de cada campanha, com os contactos do marketeer responsável, e
-    o histórico do budget. O cliente não altera nada aqui: o budget é
-    definido pelo Administrador.
+    detalhes de cada campanha, com os contactos do marketeer responsável, o
+    histórico do budget e exportar o relatório das campanhas. O cliente não
+    altera nada aqui: o budget é definido pelo Administrador.
 
     :param ligacao: Ligação aberta à base de dados.
     :param utilizador: Cliente que está a usar o menu.
@@ -591,11 +616,19 @@ def do_cliente(ligacao: sqlite3.Connection, utilizador: Utilizador) -> None:
         else:
             print('Ainda não tem campanhas. Pode pedir uma na opção "Pedidos de campanha".')
         escolha = comum.escolher_opcao(
-            "Campanhas", [("1", "Ver campanha e marketeer responsável"), ("2", "Histórico do budget"), ("0", "Voltar")]
+            "Campanhas",
+            [
+                ("1", "Ver campanha e marketeer responsável"),
+                ("2", "Histórico do budget"),
+                ("3", "Exportar relatório"),
+                ("0", "Voltar"),
+            ],
         )
         if escolha == "0":
             return
         if escolha == "1":
             ver_do_cliente(ligacao, utilizador)
-        else:
+        elif escolha == "2":
             historico_do_cliente(ligacao, utilizador)
+        else:
+            exportar_relatorio(ligacao, utilizador)

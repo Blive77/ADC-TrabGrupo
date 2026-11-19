@@ -6,6 +6,8 @@ from datetime import date, datetime
 import pytest
 
 from gestor_campanhas import modelos, relogio, seguranca
+from gestor_campanhas.cli import campanhas as menu_campanhas
+from gestor_campanhas.cli import comum
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
 from gestor_campanhas.repositorios import criativos as criativos_bd
@@ -132,3 +134,54 @@ def test_caminho_livre_numera_os_nomes_repetidos(tmp_path):
 
     assert ficheiros.caminho_livre(str(tmp_path), "banner.png") == tmp_path / "banner (2).png"
     assert ficheiros.caminho_livre(str(tmp_path), "novo.png") == tmp_path / "novo.png"
+
+
+# --- menu --------------------------------------------------------------------
+
+
+def test_menu_das_campanhas_do_cliente_tem_exportar_relatorio(teclado, ligacao, cliente, natal, capsys):
+    teclado("0")
+
+    menu_campanhas.do_cliente(ligacao, cliente)
+
+    assert "  3. Exportar relatório" in capsys.readouterr().out
+
+
+def test_menu_grava_o_relatorio_na_pasta_indicada(teclado, ligacao, cliente, natal, tmp_path, capsys):
+    teclado("3", str(tmp_path), "", "0")
+
+    menu_campanhas.do_cliente(ligacao, cliente)
+
+    saida = capsys.readouterr().out
+    assert "O relatório tem uma linha por criativo" in saida
+    assert f"Relatório gravado em {tmp_path / 'relatorio-campanhas-2026-11-19.csv'}" in saida
+    assert (tmp_path / "relatorio-campanhas-2026-11-19.csv").exists()
+
+
+def test_menu_grava_nas_transferencias_com_enter(teclado, ligacao, cliente, natal, tmp_path, monkeypatch):
+    transferencias = tmp_path / "Downloads"
+    transferencias.mkdir()
+    monkeypatch.setattr(comum, "pasta_transferencias", lambda: transferencias)
+    teclado("3", "", "", "0")
+
+    menu_campanhas.do_cliente(ligacao, cliente)
+
+    assert (transferencias / "relatorio-campanhas-2026-11-19.csv").exists()
+
+
+def test_menu_avisa_quando_a_pasta_nao_existe(teclado, ligacao, cliente, natal, tmp_path, capsys):
+    teclado("3", str(tmp_path / "nao_existe"), "", "0")
+
+    menu_campanhas.do_cliente(ligacao, cliente)
+
+    assert "não existe. O relatório não foi gravado." in capsys.readouterr().out
+
+
+def test_menu_sem_campanhas_nao_grava_nada(teclado, ligacao, cliente, tmp_path, capsys):
+    teclado("3", str(tmp_path), "", "0")
+
+    menu_campanhas.do_cliente(ligacao, cliente)
+
+    saida = capsys.readouterr().out
+    assert "Ainda não tem campanhas, por isso não há nada para exportar. O relatório não foi gravado." in saida
+    assert list(tmp_path.glob("*.csv")) == []

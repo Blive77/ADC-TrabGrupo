@@ -7,6 +7,7 @@ import pytest
 
 from gestor_campanhas import config, dados_demo, modelos
 from gestor_campanhas.cli import campanhas as menu_campanhas
+from gestor_campanhas.cli import comum
 from gestor_campanhas.cli import criativos as menu
 from gestor_campanhas.cli import perfis
 from gestor_campanhas.erros import ErroValidacao
@@ -1263,7 +1264,7 @@ def test_cliente_descarrega_para_uma_pasta(teclado, ligacao, contas, com_ficheir
 def test_cliente_descarrega_para_as_transferencias(teclado, ligacao, contas, com_ficheiro, tmp_path, monkeypatch):
     transferencias = tmp_path / "Downloads"
     transferencias.mkdir()
-    monkeypatch.setattr(menu, "pasta_transferencias", lambda: transferencias)
+    monkeypatch.setattr(comum, "pasta_transferencias", lambda: transferencias)
     teclado("5", str(com_ficheiro.id), "", "", "0")
 
     menu.do_cliente(ligacao, contas[modelos.CLIENTE])
@@ -1291,7 +1292,7 @@ def test_descarregar_um_criativo_sem_ficheiro(teclado, ligacao, contas, natal, c
 
 
 def test_pasta_transferencias_fica_na_pasta_pessoal():
-    assert menu.pasta_transferencias() == Path.home() / "Downloads"
+    assert comum.pasta_transferencias() == Path.home() / "Downloads"
 
 
 # --- despesa e budget --------------------------------------------------------
