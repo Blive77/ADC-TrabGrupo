@@ -2,6 +2,31 @@
 
 Todas as alterações relevantes da aplicação, por versão. Cada versão corresponde a uma fase do projeto.
 
+## v0.6.0 — Comentários, notificações, painel e relatório (2026-11-20)
+
+### Acrescentado
+
+- Comentários dos criativos: o Cliente comenta ou sugere alterações a um criativo, na opção nova "Comentar criativo"; o Marketeer vê os comentários no detalhe do criativo e responde a cada um, na opção nova "Responder a comentário". A lista dos criativos do Marketeer diz quantos comentários estão por responder.
+- Notificações para o Marketeer (campanha atribuída, pedido de budget novo, comentário novo) e para o Cliente (decisão de um pedido de budget, com o budget novo ou o motivo; criativo criado, alterado, eliminado, com o estado mudado ou com um ficheiro novo; resposta a um comentário). Cada notificação fica na opção nova "Notificações", de onde se abre diretamente o item a que se refere, e é também enviada por email.
+- Aviso das notificações por ler, por cima do menu do Marketeer e do Cliente.
+- Painel de marketeers, na opção nova "Painel de marketeers" do Administrador: campanhas ativas, criativos ativos, em atraso e concluídos de cada marketeer, a última atividade e os marketeers sem atividade em destaque. Mostra também o trabalho de cada marketeer, compara a carga num período e deixa mudar o número de dias sem atividade (7, de início).
+- Registo da atividade dos marketeers (criativos criados, editados, eliminados, com o estado mudado ou com um ficheiro novo, e respostas a comentários).
+- Relatório das campanhas do Cliente em CSV, na opção "Campanhas", "Exportar relatório", pronto a abrir no Excel.
+- Um comentário de demonstração, ao criativo "Vídeo da montra".
+
+### Alterado
+
+- O aviso ao marketeer de que passou a ser responsável por uma campanha passa a ser também uma notificação, além do email.
+- Os menus do Marketeer e do Cliente ganharam a opção "Notificações", e o do Administrador a opção "Painel de marketeers". As opções da conta ("Editar os meus dados" e "Alterar a password") mudaram de número.
+- O menu de criativos do Marketeer ganhou a opção 8 e o do Cliente a opção 6; as campanhas do Cliente ganharam a opção 3.
+- Um criativo eliminado leva consigo os comentários dele.
+
+### User stories concluídas
+
+C17, C18, C19, C20, M17, M18, A17, A18 e A19.
+
+Ficam também concluídos os avisos sobre os pedidos de budget (C17 e M18) que tinham sido adiados na versão 0.5.0.
+
 ## v0.5.0 — Budget (2026-11-19)
 
 ### Acrescentado
