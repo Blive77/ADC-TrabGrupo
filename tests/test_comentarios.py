@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 import pytest
 
-from gestor_campanhas import modelos, relogio, seguranca
+from gestor_campanhas import config, dados_demo, modelos, relogio, seguranca
 from gestor_campanhas.cli import criativos as menu
 from gestor_campanhas.erros import ErroValidacao
 from gestor_campanhas.repositorios import campanhas as campanhas_bd
@@ -341,3 +341,52 @@ def test_lista_do_marketeer_sem_comentarios_por_responder_nao_avisa(
     menu.da_campanha(ligacao, contas[modelos.MARKETEER], natal)
 
     assert "por responder" not in capsys.readouterr().out
+
+
+# --- dados de demonstração ---------------------------------------------------
+
+
+def _demo_ate_aos_criativos(ligacao):
+    dados_demo.criar_contas(ligacao)
+    dados_demo.criar_campanhas(ligacao)
+    dados_demo.criar_criativos(ligacao)
+
+
+def test_dados_demo_criam_um_comentario_da_carla_ao_video(ligacao):
+    _demo_ate_aos_criativos(ligacao)
+
+    criados = dados_demo.criar_comentarios(ligacao)
+
+    assert criados == ["Gostava que o vídeo mostrasse a montra à noite, com as luzes acesas."]
+    carla = utilizadores.obter_por_email(ligacao, "cliente@empresa.pt")
+    video = next(c for c in criativos_bd.listar_por_cliente(ligacao, carla.id) if c.nome == "Vídeo da montra")
+    (comentario,) = repositorio.listar_por_criativo(ligacao, video.id)
+    assert comentario.autor_id == carla.id
+    assert comentario.resposta_a is None
+
+
+def test_dados_demo_nao_repetem_comentarios(ligacao):
+    _demo_ate_aos_criativos(ligacao)
+    dados_demo.criar_comentarios(ligacao)
+
+    assert dados_demo.criar_comentarios(ligacao) == []
+
+
+def test_dados_demo_nao_comentam_um_criativo_que_foi_eliminado(ligacao):
+    _demo_ate_aos_criativos(ligacao)
+    carla = utilizadores.obter_por_email(ligacao, "cliente@empresa.pt")
+    video = next(c for c in criativos_bd.listar_por_cliente(ligacao, carla.id) if c.nome == "Vídeo da montra")
+    criativos_bd.eliminar(ligacao, video.id)
+
+    assert dados_demo.criar_comentarios(ligacao) == []
+
+
+def test_dados_demo_mostram_quantos_comentarios_criaram(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv(config.VARIAVEL_PASTA_DADOS, str(tmp_path))
+
+    dados_demo.main()
+    dados_demo.main()
+
+    saida = capsys.readouterr().out
+    assert "Comentários criados: 1 (os restantes já existiam)." in saida
+    assert "Comentários criados: 0 (os restantes já existiam)." in saida
