@@ -352,17 +352,24 @@ def _demo_ate_aos_criativos(ligacao):
     dados_demo.criar_criativos(ligacao)
 
 
-def test_dados_demo_criam_um_comentario_da_carla_ao_video(ligacao):
+def test_dados_demo_criam_dois_comentarios_da_carla_e_um_ja_tem_resposta(ligacao):
     _demo_ate_aos_criativos(ligacao)
 
     criados = dados_demo.criar_comentarios(ligacao)
 
-    assert criados == ["Gostava que o vídeo mostrasse a montra à noite, com as luzes acesas."]
+    assert criados == [
+        "Gostava que o vídeo mostrasse a montra à noite, com as luzes acesas.",
+        "O vermelho do fundo podia ser o da nossa marca.",
+    ]
     carla = utilizadores.obter_por_email(ligacao, "cliente@empresa.pt")
-    video = next(c for c in criativos_bd.listar_por_cliente(ligacao, carla.id) if c.nome == "Vídeo da montra")
-    (comentario,) = repositorio.listar_por_criativo(ligacao, video.id)
+    miguel = utilizadores.obter_por_email(ligacao, "marketeer@agencia.pt")
+    por_nome = {c.nome: c for c in criativos_bd.listar_por_cliente(ligacao, carla.id)}
+    (comentario,) = repositorio.listar_por_criativo(ligacao, por_nome["Vídeo da montra"].id)
     assert comentario.autor_id == carla.id
     assert comentario.resposta_a is None
+    pergunta, resposta = repositorio.listar_por_criativo(ligacao, por_nome["Banner de Natal"].id)
+    assert pergunta.autor_id == carla.id
+    assert (resposta.autor_id, resposta.resposta_a) == (miguel.id, pergunta.id)
 
 
 def test_dados_demo_nao_repetem_comentarios(ligacao):
@@ -378,7 +385,7 @@ def test_dados_demo_nao_comentam_um_criativo_que_foi_eliminado(ligacao):
     video = next(c for c in criativos_bd.listar_por_cliente(ligacao, carla.id) if c.nome == "Vídeo da montra")
     criativos_bd.eliminar(ligacao, video.id)
 
-    assert dados_demo.criar_comentarios(ligacao) == []
+    assert dados_demo.criar_comentarios(ligacao) == ["O vermelho do fundo podia ser o da nossa marca."]
 
 
 def test_dados_demo_mostram_quantos_comentarios_criaram(monkeypatch, tmp_path, capsys):
@@ -388,5 +395,5 @@ def test_dados_demo_mostram_quantos_comentarios_criaram(monkeypatch, tmp_path, c
     dados_demo.main()
 
     saida = capsys.readouterr().out
-    assert "Comentários criados: 1 (os restantes já existiam)." in saida
+    assert "Comentários criados: 2 (os restantes já existiam)." in saida
     assert "Comentários criados: 0 (os restantes já existiam)." in saida
