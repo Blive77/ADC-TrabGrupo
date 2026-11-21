@@ -67,7 +67,7 @@ No primeiro arranque é criada a pasta `dados`, com a base de dados `app.db`. Es
 
 ### Contas de demonstração
 
-Uma instalação nova não tem contas. Para criar as contas, as campanhas, os pedidos, os criativos, o pedido de budget e o comentário de demonstração:
+Uma instalação nova não tem contas. Para criar as contas, as campanhas, os pedidos, os criativos, o pedido de budget e os comentários de demonstração:
 
 ```bash
 python -m gestor_campanhas.dados_demo
@@ -84,7 +84,7 @@ python -m gestor_campanhas.dados_demo
 
 Estas passwords são públicas e servem só para demonstração.
 
-O mesmo comando cria três campanhas, dois pedidos de campanha pendentes, quatro criativos, um pedido de alteração de budget pendente, para a campanha `Natal 2026` passar de 1500 € para 2000 €, e um comentário da cliente `cliente@empresa.pt` ao criativo `Vídeo da montra`. Pode ser repetido: só acrescenta o que faltar.
+O mesmo comando cria três campanhas, dois pedidos de campanha pendentes, quatro criativos em estados diferentes (o `Banner de Natal` fica em revisão, com um ficheiro, à espera da aprovação da cliente `cliente@empresa.pt`), um pedido de alteração de budget pendente, para a campanha `Natal 2026` passar de 1500 € para 2000 €, e dois comentários da cliente `cliente@empresa.pt`, um deles já respondido. Cada conta encontra as notificações do que lhe diz respeito. Pode ser repetido: só acrescenta o que faltar.
 
 ### Clientes e marketeers
 
