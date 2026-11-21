@@ -16,7 +16,9 @@ Uma agência usa-a para organizar o trabalho com os seus clientes: os clientes p
 
 ## Estado do projeto
 
-O desenvolvimento é feito por fases, cada uma fechada com uma *release*. As funcionalidades previstas estão registadas nas [issues](https://github.com/Blive77/ADC-TrabGrupo/issues) do repositório, uma por *user story*.
+As 57 *user stories* do projeto estão implementadas: 19 do Administrador, 18 do Marketeer e 20 do Cliente. Cada uma está registada numa [issue](https://github.com/Blive77/ADC-TrabGrupo/issues?q=is%3Aissue+label%3A%22user+story%22) do repositório, com os critérios de aceitação, e foi fechada pelo *pull request* que a implementou.
+
+O desenvolvimento foi feito por fases, cada uma fechada com uma *release*:
 
 | Versão | Conteúdo |
 |---|---|
@@ -187,7 +189,9 @@ python -m gestor_campanhas
 
 Para recomeçar com uma base de dados vazia, basta apagar a pasta de dados.
 
-## Desenvolvimento
+Duas definições ficam guardadas na base de dados: os minutos sem atividade ao fim dos quais a sessão termina (15, por omissão) e os dias ao fim dos quais um marketeer aparece como parado no painel (7, por omissão, mudam-se no próprio painel). Os pormenores estão na página "Instalação e configuração" da documentação.
+
+## Testes e documentação
 
 Os testes e a documentação precisam do pytest e do Sphinx. Recomenda-se um ambiente virtual:
 
@@ -203,23 +207,36 @@ Correr os testes:
 python -m pytest
 ```
 
-Gerar a documentação do código (fica em `docs/_build/html/index.html`):
+Há testes de três tipos:
+
+- **das regras de cada parte da aplicação**, um ficheiro por assunto (contas, campanhas, criativos, budget, notificações...);
+- **dos fluxos completos**, em `tests/test_fluxos.py`, que seguem o caminho das pessoas na aplicação com os três perfis, do pedido de campanha ao criativo publicado e do pedido de budget à decisão;
+- **da documentação**, em `tests/test_documentacao.py`, que confirmam que todos os módulos, classes e funções têm docstring e que a referência do Sphinx inclui todos os módulos.
+
+Gerar a documentação do código (fica em `docs/_build/html/index.html`; o `-W` faz o comando falhar se houver algum aviso):
 
 ```bash
-python -m sphinx -b html docs docs/_build/html
+python -m sphinx -W -b html docs docs/_build/html
 ```
+
+O GitHub Actions corre os testes e gera a documentação em cada *pull request*.
 
 ## Estrutura do projeto
 
 ```
 gestor_campanhas/      código da aplicação
+  __init__.py          versão da aplicação
   __main__.py          ponto de entrada
-  config.py            caminhos da pasta de dados e da base de dados
+  config.py            caminhos da pasta de dados e valores por omissão das definições
   bd.py                ligação SQLite e criação das tabelas
-  modelos.py           classes de dados
+  modelos.py           classes de dados, perfis, estados e plataformas
+  erros.py             erros que os menus mostram ao utilizador
+  relogio.py           data e hora atuais
   seguranca.py         hash das passwords
-  repositorios/        leitura e escrita na base de dados
-  servicos/            regras de negócio
+  dinheiro.py          conversão de valores em euros
+  dados_demo.py        dados de demonstração
+  repositorios/        leitura e escrita na base de dados, um módulo por tabela
+  servicos/            regras de negócio, um módulo por assunto
   cli/                 menus da linha de comandos
 tests/                 testes automáticos (pytest)
 docs/                  documentação do código (Sphinx)
@@ -231,8 +248,8 @@ requirements-dev.txt   ferramentas de desenvolvimento
 
 ## Documentação
 
-- **Documentação do código:** pasta [`docs/`](docs/), gerada com o Sphinx a partir dos docstrings.
-- **Wiki do repositório:** [wiki](https://github.com/Blive77/ADC-TrabGrupo/wiki), com a apresentação do projeto, o fluxo de trabalho e o registo das fases.
+- **Documentação do código:** pasta [`docs/`](docs/), gerada com o Sphinx. Tem as páginas de instalação e configuração, utilização, arquitetura, modelo de dados e testes, e a referência de todos os módulos, gerada a partir dos docstrings.
+- **Wiki do repositório:** [wiki](https://github.com/Blive77/ADC-TrabGrupo/wiki), com a apresentação do projeto, o guia de utilização por perfil, a arquitetura, o fluxo de trabalho com o Git e o registo das fases.
 - **Como contribuir:** [CONTRIBUTING.md](CONTRIBUTING.md) descreve os ramos, as mensagens de commit e os pull requests.
 
 ## Equipa
