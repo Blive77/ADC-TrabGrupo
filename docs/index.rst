@@ -19,6 +19,7 @@ organizado o código e o que faz cada módulo.
    instalacao
    utilizacao
    arquitetura
+   modelo_dados
    testes
    referencia
 

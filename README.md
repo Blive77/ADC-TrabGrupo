@@ -16,7 +16,9 @@ Uma agência usa-a para organizar o trabalho com os seus clientes: os clientes p
 
 ## Estado do projeto
 
-O desenvolvimento é feito por fases, cada uma fechada com uma *release*. As funcionalidades previstas estão registadas nas [issues](https://github.com/Blive77/ADC-TrabGrupo/issues) do repositório, uma por *user story*.
+As 57 *user stories* do projeto estão implementadas: 19 do Administrador, 18 do Marketeer e 20 do Cliente. Cada uma está registada numa [issue](https://github.com/Blive77/ADC-TrabGrupo/issues?q=is%3Aissue+label%3A%22user+story%22) do repositório, com os critérios de aceitação, e foi fechada pelo *pull request* que a implementou.
+
+O desenvolvimento foi feito por fases, cada uma fechada com uma *release*:
 
 | Versão | Conteúdo |
 |---|---|
@@ -26,6 +28,7 @@ O desenvolvimento é feito por fases, cada uma fechada com uma *release*. As fun
 | v0.4.0 | Criativos: o Marketeer cria os criativos de cada campanha, com custo, prazo, público-alvo, plataforma e ficheiro; o Cliente vê-os, filtra-os, aprova-os ou rejeita-os e descarrega os ficheiros; a despesa é comparada com o budget |
 | v0.5.0 | Budget: o Cliente pede a alteração do budget de uma campanha, o Marketeer dá parecer e o Administrador decide; o histórico do budget de cada campanha e o resumo global do budget por cliente |
 | v0.6.0 | Comentários, notificações, painel e relatório: o Cliente comenta os criativos e o Marketeer responde; notificações na aplicação e por email; o painel de marketeers do Administrador; o relatório das campanhas do Cliente em CSV |
+| **v1.0.0** | **Fecho e entrega:** testes dos fluxos completos com os três perfis, dados de demonstração finais e documentação revista. Primeira versão completa |
 
 O detalhe de cada versão está no [registo de alterações](CHANGELOG.md).
 
@@ -55,7 +58,7 @@ A aplicação mostra um menu numerado. Escreve-se o número da opção e prime-s
 
 ```
 ============================================================
-Gestor de Campanhas v0.6.0
+Gestor de Campanhas v1.0.0
 ============================================================
   1. Entrar
   2. Recuperar a password
@@ -67,7 +70,7 @@ No primeiro arranque é criada a pasta `dados`, com a base de dados `app.db`. Es
 
 ### Contas de demonstração
 
-Uma instalação nova não tem contas. Para criar as contas, as campanhas, os pedidos, os criativos, o pedido de budget e o comentário de demonstração:
+Uma instalação nova não tem contas. Para criar as contas, as campanhas, os pedidos, os criativos, o pedido de budget e os comentários de demonstração:
 
 ```bash
 python -m gestor_campanhas.dados_demo
@@ -84,7 +87,7 @@ python -m gestor_campanhas.dados_demo
 
 Estas passwords são públicas e servem só para demonstração.
 
-O mesmo comando cria três campanhas, dois pedidos de campanha pendentes, quatro criativos, um pedido de alteração de budget pendente, para a campanha `Natal 2026` passar de 1500 € para 2000 €, e um comentário da cliente `cliente@empresa.pt` ao criativo `Vídeo da montra`. Pode ser repetido: só acrescenta o que faltar.
+O mesmo comando cria três campanhas, dois pedidos de campanha pendentes, quatro criativos em estados diferentes (o `Banner de Natal` fica em revisão, com um ficheiro, à espera da aprovação da cliente `cliente@empresa.pt`), um pedido de alteração de budget pendente, para a campanha `Natal 2026` passar de 1500 € para 2000 €, e dois comentários da cliente `cliente@empresa.pt`, um deles já respondido. Cada conta encontra as notificações do que lhe diz respeito. Pode ser repetido: só acrescenta o que faltar.
 
 ### Clientes e marketeers
 
@@ -187,7 +190,9 @@ python -m gestor_campanhas
 
 Para recomeçar com uma base de dados vazia, basta apagar a pasta de dados.
 
-## Desenvolvimento
+Duas definições ficam guardadas na base de dados: os minutos sem atividade ao fim dos quais a sessão termina (15, por omissão) e os dias ao fim dos quais um marketeer aparece como parado no painel (7, por omissão, mudam-se no próprio painel). Os pormenores estão na página "Instalação e configuração" da documentação.
+
+## Testes e documentação
 
 Os testes e a documentação precisam do pytest e do Sphinx. Recomenda-se um ambiente virtual:
 
@@ -203,23 +208,36 @@ Correr os testes:
 python -m pytest
 ```
 
-Gerar a documentação do código (fica em `docs/_build/html/index.html`):
+Há testes de três tipos:
+
+- **das regras de cada parte da aplicação**, um ficheiro por assunto (contas, campanhas, criativos, budget, notificações...);
+- **dos fluxos completos**, em `tests/test_fluxos.py`, que seguem o caminho das pessoas na aplicação com os três perfis, do pedido de campanha ao criativo publicado e do pedido de budget à decisão;
+- **da documentação**, em `tests/test_documentacao.py`, que confirmam que todos os módulos, classes e funções têm docstring e que a referência do Sphinx inclui todos os módulos.
+
+Gerar a documentação do código (fica em `docs/_build/html/index.html`; o `-W` faz o comando falhar se houver algum aviso):
 
 ```bash
-python -m sphinx -b html docs docs/_build/html
+python -m sphinx -W -b html docs docs/_build/html
 ```
+
+O GitHub Actions corre os testes e gera a documentação em cada *pull request*.
 
 ## Estrutura do projeto
 
 ```
 gestor_campanhas/      código da aplicação
+  __init__.py          versão da aplicação
   __main__.py          ponto de entrada
-  config.py            caminhos da pasta de dados e da base de dados
+  config.py            caminhos da pasta de dados e valores por omissão das definições
   bd.py                ligação SQLite e criação das tabelas
-  modelos.py           classes de dados
+  modelos.py           classes de dados, perfis, estados e plataformas
+  erros.py             erros que os menus mostram ao utilizador
+  relogio.py           data e hora atuais
   seguranca.py         hash das passwords
-  repositorios/        leitura e escrita na base de dados
-  servicos/            regras de negócio
+  dinheiro.py          conversão de valores em euros
+  dados_demo.py        dados de demonstração
+  repositorios/        leitura e escrita na base de dados, um módulo por tabela
+  servicos/            regras de negócio, um módulo por assunto
   cli/                 menus da linha de comandos
 tests/                 testes automáticos (pytest)
 docs/                  documentação do código (Sphinx)
@@ -231,8 +249,8 @@ requirements-dev.txt   ferramentas de desenvolvimento
 
 ## Documentação
 
-- **Documentação do código:** pasta [`docs/`](docs/), gerada com o Sphinx a partir dos docstrings.
-- **Wiki do repositório:** [wiki](https://github.com/Blive77/ADC-TrabGrupo/wiki), com a apresentação do projeto, o fluxo de trabalho e o registo das fases.
+- **Documentação do código:** pasta [`docs/`](docs/), gerada com o Sphinx. Tem as páginas de instalação e configuração, utilização, arquitetura, modelo de dados e testes, e a referência de todos os módulos, gerada a partir dos docstrings.
+- **Wiki do repositório:** [wiki](https://github.com/Blive77/ADC-TrabGrupo/wiki), com a apresentação do projeto, o guia de utilização por perfil, a arquitetura, o fluxo de trabalho com o Git e o registo das fases.
 - **Como contribuir:** [CONTRIBUTING.md](CONTRIBUTING.md) descreve os ramos, as mensagens de commit e os pull requests.
 
 ## Equipa

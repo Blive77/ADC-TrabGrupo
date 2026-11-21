@@ -183,6 +183,7 @@ def mostrar_tabela(cabecalhos: list[str], linhas: list[list[str]]) -> None:
             larguras[indice] = max(larguras[indice], len(celula))
 
     def formatar(celulas: list[str]) -> str:
+        """Junta as células de uma linha, cada uma com a largura da sua coluna."""
         return "  ".join(celula.ljust(largura) for celula, largura in zip(celulas, larguras)).rstrip()
 
     print(formatar(cabecalhos))

@@ -43,15 +43,47 @@ São também criadas três campanhas: ``Natal 2026`` e ``Regresso às aulas``, d
 marketeer ``marketeer@agencia.pt``, e ``Bicicletas de primavera``, da
 marketeer ``marta@agencia.pt``. Ficam também dois pedidos de campanha
 pendentes, um do cliente ``jose@padaria.pt`` e outro da cliente
-``beatriz@bicicletas.pt``, quatro criativos (dois na campanha
-``Natal 2026``, um em ``Regresso às aulas`` e um em ``Bicicletas de
-primavera``) e um pedido de alteração de budget pendente, da cliente
-``cliente@empresa.pt``, para passar o budget da campanha ``Natal 2026`` de
-1500 € para 2000 €. O budget das campanhas ``Natal 2026`` e ``Regresso às
-aulas`` fica registado no histórico do budget como ``Budget inicial``. Há
-ainda um comentário da cliente ``cliente@empresa.pt`` ao criativo
-``Vídeo da montra``, por responder. O comando pode ser repetido: só
-acrescenta o que faltar.
+``beatriz@bicicletas.pt``, e um pedido de alteração de budget pendente, da
+cliente ``cliente@empresa.pt``, para passar o budget da campanha
+``Natal 2026`` de 1500 € para 2000 €. O budget das campanhas ``Natal 2026``
+e ``Regresso às aulas`` fica registado no histórico do budget como
+``Budget inicial``.
+
+Os quatro criativos ficam em estados diferentes, para se poder experimentar
+cada perfil logo à primeira:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 25 45
+
+   * - Criativo
+     - Campanha
+     - Estado
+   * - ``Banner de Natal``
+     - ``Natal 2026``
+     - Em revisão, com o ficheiro ``banner-natal.svg``: a cliente
+       ``cliente@empresa.pt`` pode aprová-lo ou rejeitá-lo
+   * - ``Vídeo da montra``
+     - ``Natal 2026``
+     - Em preparação
+   * - ``Cartaz dos lanches``
+     - ``Regresso às aulas``
+     - Publicado
+   * - ``Anúncio da bicicleta elétrica``
+     - ``Bicicletas de primavera``
+     - Em preparação, ainda sem custo nem prazo
+
+A cliente ``cliente@empresa.pt`` comentou os dois criativos da campanha
+``Natal 2026``: o comentário ao ``Banner de Natal`` já tem resposta do
+marketeer, e o do ``Vídeo da montra`` está por responder. Como tudo isto
+passa pelas mesmas regras da aplicação, cada pessoa encontra as
+notificações do que lhe diz respeito, e o painel de marketeers mostra a
+atividade do marketeer ``marketeer@agencia.pt``.
+
+O comando pode ser repetido: só acrescenta o que faltar, e não mexe no que
+já existe. Para ver os dados de demonstração como numa instalação nova,
+apaga-se a pasta ``dados`` antes de o correr (perdem-se todos os dados que
+lá estiverem).
 
 Entrar e sair
 -------------

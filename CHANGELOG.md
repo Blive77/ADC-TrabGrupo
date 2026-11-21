@@ -2,6 +2,25 @@
 
 Todas as alterações relevantes da aplicação, por versão. Cada versão corresponde a uma fase do projeto.
 
+## v1.0.0 — Fecho e entrega (2026-11-21)
+
+Primeira versão completa, com as 57 *user stories* do projeto. Esta versão não traz funcionalidades novas: confirma que as peças funcionam juntas, completa os dados de demonstração e fecha a documentação.
+
+### Acrescentado
+
+- Testes dos fluxos completos, com os três perfis: da conta nova à primeira entrada; do pedido de campanha ao criativo publicado, passando pelo ficheiro, pelos comentários, pelas notificações e emails, pelo painel de marketeers e pelo relatório; do criativo rejeitado à aprovação; e do pedido de budget à decisão do Administrador.
+- Testes da documentação: todos os módulos, classes e funções têm docstring, as funções públicas descrevem os parâmetros e o resultado, e a referência inclui todos os módulos.
+- Página "Modelo de dados" na documentação, com as relações entre as tabelas, a forma como cada valor é guardado e o que acontece quando se apaga uma campanha ou um criativo.
+
+### Alterado
+
+- Dados de demonstração finais: os criativos ficam em estados diferentes (o "Banner de Natal" em revisão, com o ficheiro de exemplo, à espera da aprovação da cliente; o "Cartaz dos lanches" publicado), há um segundo comentário, já respondido, e cada conta encontra as notificações do que lhe diz respeito. Os dados que já existiam ficam como estavam.
+- Documentação revista: arquitetura, configuração (com as definições guardadas na base de dados), testes e README.
+
+### User stories
+
+Nenhuma nova. Ficam entregues as 57: A01 a A19, M01 a M18 e C01 a C20.
+
 ## v0.6.0 — Comentários, notificações, painel e relatório (2026-11-20)
 
 ### Acrescentado
