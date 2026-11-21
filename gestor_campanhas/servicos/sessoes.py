@@ -48,7 +48,10 @@ class SessaoAtiva:
         return self.ultima_atividade + self.limite
 
     def expirou(self) -> bool:
-        """Diz se já passou mais tempo sem atividade do que o limite."""
+        """Diz se já passou mais tempo sem atividade do que o limite.
+
+        :return: ``True`` se a sessão já expirou, ``False`` se ainda está válida.
+        """
         return relogio.agora() > self.momento_de_expiracao
 
     def registar_atividade(self) -> None:
