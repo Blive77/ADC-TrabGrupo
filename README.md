@@ -28,6 +28,7 @@ O desenvolvimento foi feito por fases, cada uma fechada com uma *release*:
 | v0.4.0 | Criativos: o Marketeer cria os criativos de cada campanha, com custo, prazo, público-alvo, plataforma e ficheiro; o Cliente vê-os, filtra-os, aprova-os ou rejeita-os e descarrega os ficheiros; a despesa é comparada com o budget |
 | v0.5.0 | Budget: o Cliente pede a alteração do budget de uma campanha, o Marketeer dá parecer e o Administrador decide; o histórico do budget de cada campanha e o resumo global do budget por cliente |
 | v0.6.0 | Comentários, notificações, painel e relatório: o Cliente comenta os criativos e o Marketeer responde; notificações na aplicação e por email; o painel de marketeers do Administrador; o relatório das campanhas do Cliente em CSV |
+| **v1.0.0** | **Fecho e entrega:** testes dos fluxos completos com os três perfis, dados de demonstração finais e documentação revista. Primeira versão completa |
 
 O detalhe de cada versão está no [registo de alterações](CHANGELOG.md).
 
@@ -57,7 +58,7 @@ A aplicação mostra um menu numerado. Escreve-se o número da opção e prime-s
 
 ```
 ============================================================
-Gestor de Campanhas v0.6.0
+Gestor de Campanhas v1.0.0
 ============================================================
   1. Entrar
   2. Recuperar a password
