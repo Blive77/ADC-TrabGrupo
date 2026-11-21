@@ -13,14 +13,14 @@ Estrutura de pastas
    gestor_campanhas/      código da aplicação
      __init__.py          versão da aplicação
      __main__.py          ponto de entrada (python -m gestor_campanhas)
-     config.py            caminhos da pasta de dados e da base de dados
+     config.py            caminhos da pasta de dados e valores por omissão das definições
      bd.py                ligação SQLite e criação das tabelas
-     modelos.py           classes de dados (Utilizador, Campanha, PedidoCampanha, Criativo, PedidoBudget), perfis e estados
+     modelos.py           classes de dados (uma por tabela), perfis, estados e plataformas
      erros.py             erros que os menus mostram ao utilizador
      relogio.py           data e hora atuais
      seguranca.py         hash das passwords
      dinheiro.py          conversão de valores em euros para cêntimos e vice-versa
-     dados_demo.py        cria as contas, as campanhas e os pedidos de demonstração
+     dados_demo.py        cria os dados de demonstração
      repositorios/        leitura e escrita na base de dados, uma tabela por módulo
      servicos/            regras de negócio, um assunto por módulo
      cli/                 menus da linha de comandos
@@ -32,7 +32,9 @@ Estrutura de pastas
        campanhas.py       campanhas, nos menus dos três perfis
        criativos.py       criativos, nos menus do Marketeer e do Cliente
        pedidos.py         pedidos de campanha, nos menus do Cliente e do Administrador
-       budget.py          pedidos de alteração de budget
+       budget.py          pedidos de alteração de budget, histórico e resumo do budget
+       notificacoes.py    notificações, nos menus do Marketeer e do Cliente
+       painel.py          painel de marketeers, no menu do Administrador
        conta.py           opções da conta, comuns a todos os perfis
        recuperacao.py     recuperação da password
    exemplos/              ficheiros para experimentar a aplicação
