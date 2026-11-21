@@ -18,6 +18,7 @@ from gestor_campanhas import modelos, relogio
 from gestor_campanhas.erros import ErroAutenticacao, ErroValidacao
 from gestor_campanhas.servicos import (
     autenticacao,
+    budget,
     campanhas,
     comentarios,
     contas,
@@ -221,3 +222,74 @@ def test_pedido_de_campanha_rejeitado_nao_cria_campanha(ligacao, emails, carla):
         "O orçamento não chega para as duas plataformas"
     )
     assert assuntos(emails_para(emails(), carla.email)) == ["O seu pedido de campanha foi rejeitado"]
+
+
+@pytest.fixture
+def campanha_com_budget(ligacao, miguel, carla):
+    """Campanha do Miguel para a Carla, com um budget inicial de 1000 €, definido pelo Administrador."""
+    campanha = campanhas.criar(ligacao, miguel, "Verão", "Vender mais gelados", carla.id)
+    return campanhas.definir_budget(ligacao, campanha.id, "1000")
+
+
+def test_pedido_de_budget_aprovado_muda_o_budget_e_fica_no_historico(
+    ligacao, emails, relogio_falso, miguel, carla, campanha_com_budget
+):
+    campanha = campanha_com_budget
+
+    # O marketeer cria um criativo mais caro do que o budget, e é avisado.
+    criativos.criar(ligacao, miguel, campanha.id, "Vídeo da praia", custo="1200")
+    assert criativos.aviso_budget(campanha, criativos.despesa(ligacao, campanha)) != ""
+    assert [c.id for c, _ in budget.campanhas_acima_do_budget(ligacao)] == [campanha.id]
+
+    # O cliente pede mais budget; o marketeer é notificado e dá parecer.
+    passa_um_minuto(relogio_falso)
+    pedido = budget.pedir(ligacao, carla, campanha.id, "1500", "O vídeo custa mais do que o previsto")
+    [aviso] = notificacoes.listar(ligacao, miguel)
+    assert (aviso.sobre, aviso.item_id) == (modelos.SOBRE_PEDIDO_BUDGET, pedido.id)
+    passa_um_minuto(relogio_falso)
+    pedido = budget.dar_parecer(ligacao, miguel, pedido.id, True, "O vídeo é o que traz mais visitas")
+    assert pedido.estado == modelos.EM_ANALISE
+
+    # O Administrador vê o pedido com o parecer e aprova-o.
+    [pendente] = budget.listar_todos(ligacao)
+    assert pendente.parecer_justificacao == "O vídeo é o que traz mais visitas"
+    passa_um_minuto(relogio_falso)
+    pedido = budget.aprovar(ligacao, pedido.id)
+
+    # O budget mudou, o histórico tem as duas alterações e a despesa já cabe.
+    campanha = campanhas.obter_do_cliente(ligacao, carla, campanha.id)
+    assert campanha.budget_centimos == 150000
+    historico = campanhas.historico_budget(ligacao, campanha)
+    assert [(a.budget_anterior_centimos, a.budget_novo_centimos) for a in historico] == [
+        (None, 100000),
+        (100000, 150000),
+    ]
+    assert historico[-1].pedido_budget_id == pedido.id
+    assert budget.campanhas_acima_do_budget(ligacao) == []
+    [resumo] = budget.resumo_por_cliente(ligacao)
+    assert (resumo.budget_centimos, resumo.despesa_centimos, resumo.restante_centimos) == (150000, 120000, 30000)
+
+    # O cliente foi notificado da decisão, na aplicação e por email.
+    assert notificacoes.listar(ligacao, carla)[0].texto.startswith("O seu pedido de budget n.º")
+    assert assuntos(emails_para(emails(), carla.email))[-1] == "O seu pedido de budget foi aprovado"
+
+
+def test_pedido_de_budget_rejeitado_mantem_o_budget(ligacao, miguel, carla, campanha_com_budget):
+    campanha = campanha_com_budget
+    pedido = budget.pedir(ligacao, carla, campanha.id, "3000", "Queremos anunciar também na televisão")
+
+    # Sem o parecer do marketeer, o Administrador ainda não pode decidir.
+    with pytest.raises(ErroValidacao):
+        budget.rejeitar(ligacao, pedido.id, "Fora do orçamento anual")
+
+    budget.dar_parecer(ligacao, miguel, pedido.id, False, "A televisão não faz parte da campanha")
+    pedido = budget.rejeitar(ligacao, pedido.id, "Fora do orçamento anual")
+
+    assert pedido.estado == modelos.REJEITADO
+    assert campanhas.obter_do_cliente(ligacao, carla, campanha.id).budget_centimos == 100000
+    assert len(campanhas.historico_budget(ligacao, campanha)) == 1
+    assert notificacoes.listar(ligacao, carla)[0].texto.endswith("Motivo: Fora do orçamento anual")
+
+    # Depois da decisão, o cliente pode fazer um pedido novo.
+    novo = budget.pedir(ligacao, carla, campanha.id, "1200", "Só mais um anúncio em agosto")
+    assert novo.estado == modelos.PENDENTE
