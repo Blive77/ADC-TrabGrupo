@@ -99,16 +99,29 @@ def pedir(
     if not motivo:
         raise ErroValidacao("O motivo não pode ficar vazio.")
     pedido = pedidos_budget.criar(ligacao, campanha.id, campanha.budget_centimos, centimos, motivo)
+    avisar_marketeer(ligacao, cliente, campanha, pedido)
+    return pedido
+
+
+def avisar_marketeer(
+    ligacao: sqlite3.Connection, cliente: Utilizador, campanha: Campanha, pedido: PedidoBudget
+) -> None:
+    """Notifica o marketeer responsável pela campanha de um pedido de alteração de budget novo.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param cliente: Cliente que fez o pedido.
+    :param campanha: Campanha do pedido, ainda com o budget atual.
+    :param pedido: O pedido acabado de criar.
+    """
     notificacoes.notificar(
         ligacao,
         campanhas.responsavel(ligacao, campanha),
         "Novo pedido de alteração de budget",
         f"{cliente.nome} pediu para alterar o budget da campanha {campanha.nome} de "
-        f"{_valor(campanha.budget_centimos)} para {_valor(centimos)} (pedido n.º {pedido.id}).",
+        f"{_valor(campanha.budget_centimos)} para {_valor(pedido.budget_pedido_centimos)} (pedido n.º {pedido.id}).",
         modelos.SOBRE_PEDIDO_BUDGET,
         pedido.id,
     )
-    return pedido
 
 
 def listar_do_cliente(ligacao: sqlite3.Connection, cliente: Utilizador) -> list[PedidoBudget]:

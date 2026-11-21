@@ -1,14 +1,19 @@
 """Dados de demonstração.
 
 Cria um administrador, dois marketeers, três clientes, três campanhas, dois
-pedidos de campanha, quatro criativos, um pedido de alteração de budget e um
-comentário a um criativo, para se poder experimentar a aplicação logo a
-seguir a instalá-la. Corre-se
-a partir da pasta do projeto com::
+pedidos de campanha, quatro criativos em estados diferentes (um deles com
+ficheiro), um pedido de alteração de budget e dois comentários, um deles já
+respondido, para se poder experimentar a aplicação logo a seguir a
+instalá-la. Corre-se a partir da pasta do projeto com::
 
     python -m gestor_campanhas.dados_demo
 
 Pode ser corrido várias vezes: o que já existe fica como está.
+
+O que acontece aos criativos depois de criados (o ficheiro, as mudanças de
+estado) e os comentários passam pelas regras de negócio, como se fossem
+feitos na aplicação. Por isso o cliente e o marketeer encontram as
+notificações correspondentes, e o painel de marketeers mostra a atividade.
 
 As passwords destas contas são públicas. Servem só para demonstração e não
 devem ser usadas numa instalação a sério.
@@ -19,7 +24,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import date
 
-from gestor_campanhas import bd, modelos, seguranca
+from gestor_campanhas import bd, config, modelos, seguranca
 from gestor_campanhas.cli import comum
 from gestor_campanhas.repositorios import (
     alteracoes_budget,
@@ -30,6 +35,9 @@ from gestor_campanhas.repositorios import (
     pedidos_budget,
     utilizadores,
 )
+from gestor_campanhas.servicos import budget as servico_budget
+from gestor_campanhas.servicos import comentarios as servico_comentarios
+from gestor_campanhas.servicos import criativos as servico_criativos
 from gestor_campanhas.servicos.campanhas import MOTIVO_BUDGET_INICIAL
 
 #: Contas de demonstração: pelo menos uma de cada perfil.
@@ -137,7 +145,9 @@ PEDIDOS = [
 
 
 #: Criativos de demonstração. A campanha é indicada pelo nome, e tem de ser
-#: uma das de :data:`CAMPANHAS`. O custo está em cêntimos.
+#: uma das de :data:`CAMPANHAS`. O custo está em cêntimos. O ``estado`` é o
+#: estado a que o criativo é levado depois de criado, e o ``ficheiro``, se
+#: houver, é o caminho, a partir da pasta do projeto, do ficheiro a anexar.
 CRIATIVOS = [
     {
         "campanha": "Natal 2026",
@@ -147,6 +157,8 @@ CRIATIVOS = [
         "prazo": date(2026, 11, 25),
         "publico": "Famílias da região de Lisboa",
         "plataforma": "Facebook",
+        "estado": modelos.EM_REVISAO,
+        "ficheiro": "exemplos/banner-natal.svg",
     },
     {
         "campanha": "Natal 2026",
@@ -156,6 +168,7 @@ CRIATIVOS = [
         "prazo": date(2026, 11, 28),
         "publico": "Jovens adultos, 18 a 35 anos",
         "plataforma": "Instagram",
+        "estado": modelos.EM_PREPARACAO,
     },
     {
         "campanha": "Regresso às aulas",
@@ -165,6 +178,7 @@ CRIATIVOS = [
         "prazo": date(2026, 8, 25),
         "publico": "Pais de alunos do básico",
         "plataforma": "Facebook",
+        "estado": modelos.PUBLICADO,
     },
     {
         "campanha": "Bicicletas de primavera",
@@ -174,6 +188,7 @@ CRIATIVOS = [
         "prazo": None,
         "publico": "",
         "plataforma": "",
+        "estado": modelos.EM_PREPARACAO,
     },
 ]
 
@@ -190,12 +205,20 @@ PEDIDOS_BUDGET = [
 
 #: Comentários de demonstração, escritos pelo cliente da campanha. O criativo
 #: é indicado pelo nome da campanha e pelo nome do criativo, que têm de ser
-#: dos de :data:`CAMPANHAS` e :data:`CRIATIVOS`.
+#: dos de :data:`CAMPANHAS` e :data:`CRIATIVOS`. A ``resposta``, se não
+#: estiver vazia, é a resposta do marketeer da campanha.
 COMENTARIOS = [
     {
         "campanha": "Natal 2026",
         "criativo": "Vídeo da montra",
         "texto": "Gostava que o vídeo mostrasse a montra à noite, com as luzes acesas.",
+        "resposta": "",
+    },
+    {
+        "campanha": "Natal 2026",
+        "criativo": "Banner de Natal",
+        "texto": "O vermelho do fundo podia ser o da nossa marca.",
+        "resposta": "Combinado: na próxima versão o fundo fica com o vermelho da marca.",
     },
 ]
 
@@ -299,11 +322,39 @@ def criar_pedidos(ligacao: sqlite3.Connection) -> list[str]:
     return criados
 
 
+def preparar_criativo(ligacao: sqlite3.Connection, criativo: modelos.Criativo, dados: dict) -> None:
+    """Anexa o ficheiro a um criativo de demonstração acabado de criar e leva-o ao seu estado.
+
+    Usa as regras de negócio, pela ordem em que o marketeer e o cliente o
+    fariam na aplicação: anexar o ficheiro, enviar para revisão, aprovar e
+    publicar. Assim, o cliente recebe a notificação de cada passo e a
+    atividade do marketeer fica registada.
+
+    :param ligacao: Ligação aberta à base de dados.
+    :param criativo: O criativo, ainda em preparação.
+    :param dados: A entrada de :data:`CRIATIVOS` de onde o criativo foi criado.
+    """
+    campanha = campanhas.obter_por_id(ligacao, criativo.campanha_id)
+    marketeer = utilizadores.obter_por_id(ligacao, campanha.marketeer_id)
+    cliente = utilizadores.obter_por_id(ligacao, campanha.cliente_id)
+    if dados.get("ficheiro"):
+        servico_criativos.anexar(ligacao, marketeer, criativo.id, str(config.PASTA_PROJETO / dados["ficheiro"]))
+    estado = dados["estado"]
+    if estado in (modelos.EM_REVISAO, modelos.APROVADO, modelos.PUBLICADO):
+        servico_criativos.mudar_estado(ligacao, marketeer, criativo.id, modelos.EM_REVISAO)
+    if estado in (modelos.APROVADO, modelos.PUBLICADO):
+        servico_criativos.aprovar(ligacao, cliente, criativo.id)
+    if estado == modelos.PUBLICADO:
+        servico_criativos.mudar_estado(ligacao, marketeer, criativo.id, modelos.PUBLICADO)
+
+
 def criar_criativos(ligacao: sqlite3.Connection) -> list[str]:
     """Cria os criativos de demonstração que ainda não existem.
 
     As campanhas de demonstração têm de existir (ver :func:`criar_campanhas`).
     Um criativo já existe quando a campanha dele tem um criativo com o mesmo nome.
+    Cada criativo criado recebe o seu ficheiro e o seu estado (ver
+    :func:`preparar_criativo`); os que já existiam ficam como estão.
 
     :param ligacao: Ligação aberta à base de dados.
     :return: Nomes dos criativos criados nesta chamada.
@@ -315,7 +366,7 @@ def criar_criativos(ligacao: sqlite3.Connection) -> list[str]:
         existentes = [existente.nome for existente in criativos.listar_por_campanha(ligacao, campanha.id)]
         if criativo["nome"] in existentes:
             continue
-        criativos.criar(
+        novo = criativos.criar(
             ligacao,
             campanha.id,
             criativo["nome"],
@@ -325,6 +376,7 @@ def criar_criativos(ligacao: sqlite3.Connection) -> list[str]:
             criativo["publico"],
             criativo["plataforma"],
         )
+        preparar_criativo(ligacao, novo, criativo)
         criados.append(criativo["nome"])
     return criados
 
@@ -334,7 +386,8 @@ def criar_pedidos_budget(ligacao: sqlite3.Connection) -> list[str]:
 
     As campanhas de demonstração têm de existir (ver :func:`criar_campanhas`).
     Um pedido já existe quando o cliente da campanha tem um pedido de budget
-    com o mesmo motivo, em qualquer estado.
+    com o mesmo motivo, em qualquer estado. O marketeer da campanha é
+    notificado de cada pedido criado.
 
     :param ligacao: Ligação aberta à base de dados.
     :return: Motivos dos pedidos criados nesta chamada.
@@ -346,7 +399,9 @@ def criar_pedidos_budget(ligacao: sqlite3.Connection) -> list[str]:
         existentes = [existente.motivo for existente in pedidos_budget.listar_por_cliente(ligacao, campanha.cliente_id)]
         if pedido["motivo"] in existentes:
             continue
-        pedidos_budget.criar(ligacao, campanha.id, campanha.budget_centimos, pedido["budget"], pedido["motivo"])
+        novo = pedidos_budget.criar(ligacao, campanha.id, campanha.budget_centimos, pedido["budget"], pedido["motivo"])
+        cliente = utilizadores.obter_por_id(ligacao, campanha.cliente_id)
+        servico_budget.avisar_marketeer(ligacao, cliente, campanha, novo)
         criados.append(pedido["motivo"])
     return criados
 
@@ -357,6 +412,9 @@ def criar_comentarios(ligacao: sqlite3.Connection) -> list[str]:
     Os criativos de demonstração têm de existir (ver :func:`criar_criativos`).
     Um comentário já existe quando o criativo tem um comentário com o mesmo
     texto. Se o criativo tiver sido eliminado, o comentário não é criado.
+
+    Os comentários e as respostas passam pelas regras de negócio: o marketeer
+    é notificado de cada comentário e o cliente de cada resposta.
 
     :param ligacao: Ligação aberta à base de dados.
     :return: Textos dos comentários criados nesta chamada.
@@ -373,7 +431,11 @@ def criar_comentarios(ligacao: sqlite3.Connection) -> list[str]:
         existentes = [existente.texto for existente in comentarios.listar_por_criativo(ligacao, criativo.id)]
         if comentario["texto"] in existentes:
             continue
-        comentarios.criar(ligacao, criativo.id, campanha.cliente_id, comentario["texto"])
+        cliente = utilizadores.obter_por_id(ligacao, campanha.cliente_id)
+        novo = servico_comentarios.comentar(ligacao, cliente, criativo.id, comentario["texto"])
+        if comentario["resposta"]:
+            marketeer = utilizadores.obter_por_id(ligacao, campanha.marketeer_id)
+            servico_comentarios.responder(ligacao, marketeer, novo.id, comentario["resposta"])
         criados.append(comentario["texto"])
     return criados
 
