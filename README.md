@@ -2,6 +2,8 @@
 
 Trabalho de Grupo UAlg 2026.
 
+> [!IMPORTANT]
+> O objetivo deste projeto era aprender a usar corretamente o Git e o GitHub para organizar e gerir um projeto em equipa: ramos (Git Flow), issues e user stories, milestones, pull requests com revisão, releases e wiki. Todo o código foi escrito com a ajuda de ferramentas de inteligência artificial.
 Aplicação de linha de comandos para gestão de campanhas de marketing, escrita em Python.
 
 Uma agência usa-a para organizar o trabalho com os seus clientes: os clientes pedem campanhas, o administrador aprova-as e define o budget, e os marketeers produzem os criativos (anúncios) que o cliente acompanha e aprova.
